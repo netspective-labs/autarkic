@@ -1,0 +1,277 @@
+<!-- lib/html/browser-ua/fluent_test.html
+
+Browser harness (no third-party test frameworks).
+- Uses PicoCSS from CDN for nicer presentation.
+- Uses ONLY relative paths for imports. The bundle is expected to be served from the same directory:
+    ./fluent-browser-ua.auto.js
+
+How to use:
+- Serve the repo (or at least /lib/html/browser-ua/) from any static server.
+- Open this file in the browser.
+
+What it tests:
+1) Named tag exports exist (sample set, expandable)
+2) Basic element creation, attrs, raw()
+3) Auto-integration loading behavior (offline, deterministic) via a Blob module URL
+-->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>JunxionUX fluent browser harness</title>
+
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"
+    />
+
+    <style>
+      .pass {
+        color: #0a7;
+      }
+
+      .fail {
+        color: #c22;
+      }
+
+      pre {
+        overflow: auto;
+      }
+
+      code,
+      pre {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .muted {
+        opacity: 0.8;
+      }
+    </style>
+  </head>
+
+  <body class="container">
+    <header>
+      <h1>JunxionUX fluent browser harness</h1>
+      <p class="muted">
+        Tests run in-page with a lightweight runner. No external test
+        frameworks.
+      </p>
+    </header>
+
+    <main>
+      <article>
+        <header>
+          <h2>Status</h2>
+        </header>
+        <div id="summary" class="muted">Starting…</div>
+      </article>
+
+      <article>
+        <header>
+          <h2>Results</h2>
+        </header>
+        <div id="results"></div>
+      </article>
+
+      <article>
+        <header>
+          <h2>Scratch DOM</h2>
+          <p class="muted">
+            Elements created during tests may appear here or in document.body.
+          </p>
+        </header>
+        <div id="scratch"></div>
+      </article>
+    </main>
+
+    <script type="module">
+      // IMPORTANT: relative import, bundle is in same directory as this HTML file.
+      import * as F from "./fluent-browser-ua.auto.js";
+
+      const resultsEl = document.querySelector("#results");
+      const summaryEl = document.querySelector("#summary");
+      const scratchEl = document.querySelector("#scratch");
+
+      const tests = [];
+      const test = (name, fn) => tests.push({ name, fn });
+
+      const assert = (cond, msg = "assertion failed") => {
+        if (!cond) throw new Error(msg);
+      };
+      const eq = (a, b, msg) => {
+        if (a !== b) {
+          throw new Error(
+            msg ?? `expected ${String(a)} === ${String(b)}`,
+          );
+        }
+      };
+
+      const logResult = (name, ok, err) => {
+        const row = document.createElement("div");
+        row.className = ok ? "pass" : "fail";
+        row.textContent = ok
+          ? `PASS: ${name}`
+          : `FAIL: ${name}: ${err?.message ?? err}`;
+        resultsEl.appendChild(row);
+
+        if (!ok && err?.stack) {
+          const details = document.createElement("details");
+          const summary = document.createElement("summary");
+          summary.textContent = "stack";
+          const pre = document.createElement("pre");
+          pre.textContent = err.stack;
+          details.appendChild(summary);
+          details.appendChild(pre);
+          resultsEl.appendChild(details);
+        }
+      };
+
+      // 1) Presentation tags: sample set (expandable).
+      const tagNames = [
+        "div",
+        "span",
+        "a",
+        "button",
+        "input",
+        "select",
+        "option",
+        "textarea",
+        "table",
+        "thead",
+        "tbody",
+        "tr",
+        "th",
+        "td",
+        "ul",
+        "ol",
+        "li",
+        "section",
+        "article",
+        "header",
+        "footer",
+        "nav",
+        "main",
+        "img",
+        "video",
+        "audio",
+        "source",
+        "meta",
+        "link",
+        "script",
+        "style",
+        "details",
+        "summary",
+        "dialog",
+        "pre",
+        "codeTag",
+        "small",
+        "strong",
+        "em",
+        "i",
+        "label",
+        "form",
+        "fieldset",
+        "legend",
+        "canvas",
+        "template",
+      ];
+
+      test("named tag exports exist (sample set)", () => {
+        for (const name of tagNames) {
+          assert(
+            typeof F[name] === "function",
+            `missing export: ${name}`,
+          );
+        }
+        // special-case: param may be typed via fallback but must exist
+        assert(typeof F.param === "function", "missing export: param");
+      });
+
+      test("basic element creation", () => {
+        const n = F.div({ id: "x", class: "y" }, "hello");
+        eq(n.tagName.toLowerCase(), "div");
+        eq(n.getAttribute("id"), "x");
+        eq(n.getAttribute("class"), "y");
+        eq(n.textContent, "hello");
+        scratchEl.appendChild(n);
+      });
+
+      test("attrs boolean handling", () => {
+        const n = F.input({
+          disabled: true,
+          hidden: false,
+          value: "v",
+        });
+        eq(n.tagName.toLowerCase(), "input");
+        assert(n.hasAttribute("disabled"), "disabled missing");
+        assert(!n.hasAttribute("hidden"), "hidden should be omitted");
+        eq(n.getAttribute("value"), "v");
+        scratchEl.appendChild(n);
+      });
+
+      test("raw() inserts HTML nodes", () => {
+        const n = F.div(F.raw("<b>ok</b>"));
+        eq(n.querySelector("b")?.textContent, "ok");
+        scratchEl.appendChild(n);
+      });
+
+      // 2) Auto-integration test (no network):
+      // We point the runtime URL at a Blob module. When auto-discovery imports it,
+      // it sets a global marker. Then we add a node with data-on:* to trigger discovery.
+      test("auto-integration loads runtime when data-on:* appears", async () => {
+        const blob = new Blob(
+          [`
+            globalThis.__junxionUxRuntimeLoaded = (globalThis.__junxionUxRuntimeLoaded ?? 0) + 1;
+            export const loaded = true;
+          `],
+          { type: "text/javascript" },
+        );
+        const url = URL.createObjectURL(blob);
+
+        assert(
+          typeof F.setJunxionUxRuntimeModuleUrl === "function",
+          "missing setJunxionUxRuntimeModuleUrl",
+        );
+
+        // reset marker
+        globalThis.__junxionUxRuntimeLoaded = 0;
+
+        // point integration loader at fake module
+        F.setJunxionUxRuntimeModuleUrl(url);
+
+        const n = F.div({ "data-on:click": '@get("/x")' }, "Go");
+        document.body.appendChild(n);
+
+        await new Promise((r) => setTimeout(r, 25));
+
+        assert(
+          globalThis.__junxionUxRuntimeLoaded >= 1,
+          "runtime did not load (is the server running?)",
+        );
+
+        URL.revokeObjectURL(url);
+      });
+
+      // Runner
+      (async () => {
+        let pass = 0;
+        let fail = 0;
+
+        for (const t of tests) {
+          try {
+            await t.fn();
+            logResult(t.name, true);
+            pass++;
+          } catch (e) {
+            logResult(t.name, false, e);
+            fail++;
+          }
+        }
+
+        summaryEl.textContent = `Done. ${pass} passed, ${fail} failed.`;
+        summaryEl.className = fail === 0 ? "pass" : "fail";
+      })();
+    </script>
+  </body>
+</html>

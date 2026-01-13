@@ -1,0 +1,32 @@
+{
+  "name": "@netspective-labs/junxion-ux",
+  "version": "0.1.0",
+  "lock": false,
+
+  "exports": {
+    "./html/shared": "./lib/html/shared.ts",
+    "./html/server/fluent": "./lib/html/server/fluent.ts",
+    "./html/browser-ua/fluent": "./lib/html/browser-ua/fluent.ts"
+  },
+
+  "imports": {
+    "@std/assert": "jsr:@std/assert@1"
+  },
+
+  "lint": {
+    "exclude": [
+      "lib/html/browser-ua/fluent-browser-ua.auto.js"
+    ],
+    "rules": {
+      "exclude": ["no-slow-types"]
+    }
+  },
+
+  "tasks": {
+    "check": "deno check",
+    "fmt": "deno fmt",
+    "lint": "deno lint",
+    "test": "deno test -A",
+    "bundle:client": "deno bundle src/html/browser-ua/fluent.ts -o lib/html/browser-ua/fluent-browser-ua.auto.js"
+  }
+}
