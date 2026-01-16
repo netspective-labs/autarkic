@@ -2,39 +2,66 @@
 /// <reference lib="dom.iterable" />
 
 // src/html/browser-ua/fluent.ts
-//
-// Client-side fluent DOM builder + automatic hypermedia runtime loading.
-// - Juniors use named tag functions only (we do NOT export el)
-// - Uses DOM typing where possible; for tags missing from HTMLElementTagNameMap
-//   (example: "param" in some lib.dom variants), we fall back to HTMLElement.
-// - raw() opt-in for HTML injection
-// - AUTO-DISCOVERY: if DataStar-style data-* attrs exist, we auto-load the upstream runtime
-//
-// Bundled to: lib/html/browser-ua/fluent.auto.js
-//
-// Note: we intentionally avoid using the upstream project name in identifiers/exports.
 
 import {
   type Attrs,
+  attrs as mergeAttrs,
   type AttrValue,
   type Child,
-  type ChildAdder,
-  type ChildSpec,
+  children as childrenFn,
+  classNames,
+  each as eachFn,
   flattenChildren,
+  isPlainObject,
   raw,
+  styleText,
+  trustedRaw,
 } from "../../../lib/html/shared.ts";
 
-export { raw };
+export { raw, trustedRaw };
+export type { Child };
 
+export const attrs = mergeAttrs;
+export const cls = classNames;
+export const css = styleText;
+export const children = childrenFn;
+export const each = eachFn;
+
+const isAttrs = (v: unknown): v is Attrs => {
+  if (!isPlainObject(v)) return false;
+  if ("__rawHtml" in (v as Record<string, unknown>)) return false;
+  return true;
+};
+
+const VOID_ELEMENTS = new Set([
+  "area",
+  "base",
+  "br",
+  "col",
+  "embed",
+  "hr",
+  "img",
+  "input",
+  "link",
+  "meta",
+  "param",
+  "source",
+  "track",
+  "wbr",
+]);
+
+const isVoidElement = (t: string) => VOID_ELEMENTS.has(t.toLowerCase());
+
+// Internal primitive (not exported).
 const el = (tagName: string, ...args: unknown[]) => {
   let attrs: Attrs | undefined;
-  let specs: ChildSpec[];
+  let children: Child[];
 
   if (args.length > 0 && isAttrs(args[0])) {
     attrs = args[0] as Attrs;
-    specs = args.slice(1) as ChildSpec[];
+    children = args.slice(1) as Child[];
   } else {
-    specs = args as ChildSpec[];
+    children = args as Child[];
   }
 
   const node = document.createElement(tagName);
@@ -44,24 +71,15 @@ const el = (tagName: string, ...args: unknown[]) => {
     for (const k of keys) {
       const v = (attrs as Record<string, AttrValue>)[k];
       if (v == null || v === false) continue;
-      if (v === true) {
-        node.setAttribute(k, "");
-        continue;
-      }
-      node.setAttribute(k, String(v));
+      node.setAttribute(k, v === true ? "" : String(v));
     }
   }
 
-  const children: Child[] = [];
-  const add: ChildAdder = (...c) => {
-    for (const x of c) children.push(x);
-  };
-
-  for (const s of specs) {
-    if (typeof s === "function") (s as (e: ChildAdder) => void)(add);
-    else children.push(s as Child);
+  if (isVoidElement(tagName) && children.length > 0) {
+    console.warn(`Void element <${tagName}> should not have children.`);
   }
 
+  // Important: flattenChildren now executes builders, anywhere in the tree.
   for (const c of flattenChildren(children)) {
     if (typeof c === "string") {
       node.appendChild(document.createTextNode(c));
@@ -82,21 +100,53 @@ const tag =
 const legacyTag = (name: string) => (...args: unknown[]) =>
   el(name, ...(args as never[])) as HTMLElement;
 
-const isAttrs = (v: unknown): v is Attrs => {
-  if (v == null) return false;
-  if (Array.isArray(v)) return false;
-  if (typeof v === "function") return false;
-  if (typeof v !== "object") return false;
-  if ("__rawHtml" in (v as Record<string, unknown>)) return false;
-  return true;
-};
-
 export const mount = (target: Element, node: Node) => target.appendChild(node);
 export const replace = (target: Element, node: Node) =>
   target.replaceWith(node);
 
-// Automatic runtime integration (DataStar-style attributes)
-// Identifiers avoid upstream name; URL is configurable.
+export const fragment = (...children: Child[]) => {
+  const frag = document.createDocumentFragment();
+  for (const c of flattenChildren(children)) {
+    if (typeof c === "string") {
+      frag.appendChild(document.createTextNode(c));
+    } else {
+      const t = document.createElement("template");
+      t.innerHTML = c.__rawHtml;
+      frag.appendChild(t.content);
+    }
+  }
+  return frag;
+};
+
+export const scriptJs = (code: string, attrs?: Attrs) => {
+  const s = document.createElement("script");
+  if (attrs) {
+    const keys = Object.keys(attrs).sort();
+    for (const k of keys) {
+      const v = (attrs as Record<string, AttrValue>)[k];
+      if (v == null || v === false) continue;
+      s.setAttribute(k, v === true ? "" : String(v));
+    }
+  }
+  s.textContent = code;
+  return s;
+};
+
+export const styleCss = (cssText: string, attrs?: Attrs) => {
+  const s = document.createElement("style");
+  if (attrs) {
+    const keys = Object.keys(attrs).sort();
+    for (const k of keys) {
+      const v = (attrs as Record<string, AttrValue>)[k];
+      if (v == null || v === false) continue;
+      s.setAttribute(k, v === true ? "" : String(v));
+    }
+  }
+  s.textContent = cssText;
+  return s;
+};
+
+// Automatic hypermedia runtime integration (unchanged)
 let junxionUxRuntimeModuleUrl =
   "https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.0-RC.7/bundles/datastar.js";
 
@@ -239,7 +289,7 @@ export const optgroup = tag("optgroup");
 export const option = tag("option");
 export const output = tag("output");
 export const p = tag("p");
-export const param = legacyTag("param"); // Some DOM lib variants don’t include "param" in HTMLElementTagNameMap
+export const param = legacyTag("param");
 export const picture = tag("picture");
 export const pre = tag("pre");
 export const progress = tag("progress");

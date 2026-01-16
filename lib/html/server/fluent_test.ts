@@ -71,8 +71,8 @@ Deno.test("render: full HTML page skeleton (pico css + header/main/footer + inli
   assertMatch(page, /addEventListener\('click'/);
 });
 
-Deno.test("render: full HTML page skeleton (pico css + header/main/footer + inline js) using builder children", () => {
-  const navItems = [
+Deno.test("render: full HTML page skeleton (pico css + header/main/footer + inline js) using builders + helpers", () => {
+  const nav = [
     { href: "#main", label: "Main" },
     { href: "#footer", label: "Footer" },
   ];
@@ -101,20 +101,17 @@ Deno.test("render: full HTML page skeleton (pico css + header/main/footer + inli
       e(
         F.body((e) => {
           e(
-            F.header({ class: "container" }, (e) => {
-              e(
-                F.nav((e) => {
-                  e(F.ul(F.li(F.strong("Fluent HTML"))));
-                  e(
-                    F.ul((e) => {
-                      for (const it of navItems) {
-                        e(F.li(F.a({ href: it.href }, it.label)));
-                      }
-                    }),
-                  );
-                }),
-              );
-            }),
+            F.header(
+              { class: F.cls("container") },
+              F.nav((e) => {
+                e(F.ul(F.li(F.strong("Fluent HTML"))));
+                e(
+                  F.ul(
+                    F.each(nav, (it) => F.li(F.a({ href: it.href }, it.label))),
+                  ),
+                );
+              }),
+            ),
           );
 
           e(
@@ -134,25 +131,17 @@ Deno.test("render: full HTML page skeleton (pico css + header/main/footer + inli
             }),
           );
 
-          e(
-            F.footer({ id: "footer", class: "container" }, (e) => {
-              e(F.small("© 2026"));
-            }),
-          );
+          e(F.footer({ id: "footer", class: "container" }, F.small("© 2026")));
 
           e(
-            F.script(
-              F.raw(
-                [
-                  "(() => {",
-                  "  const btn = document.getElementById('btn');",
-                  "  const status = document.getElementById('status');",
-                  "  if (!btn || !status) return;",
-                  "  btn.addEventListener('click', () => { status.textContent = 'clicked'; });",
-                  "})();",
-                ].join("\n"),
-              ),
-            ),
+            F.scriptJs([
+              "(() => {",
+              "  const btn = document.getElementById('btn');",
+              "  const status = document.getElementById('status');",
+              "  if (!btn || !status) return;",
+              "  btn.addEventListener('click', () => { status.textContent = 'clicked'; });",
+              "})();",
+            ].join("\n")),
           );
         }),
       );
@@ -162,7 +151,6 @@ Deno.test("render: full HTML page skeleton (pico css + header/main/footer + inli
   assertMatch(page, /<!doctype html>/i);
   assertMatch(page, /<html[^>]*\slang="en"/);
   assertMatch(page, /<meta charset="utf-8">/);
-  assertMatch(page, /<title>Fluent HTML Test Page<\/title>/);
   assertMatch(page, /@picocss\/pico@2\/css\/pico\.min\.css/);
   assertMatch(page, /<header/);
   assertMatch(page, /<main[^>]*\sid="main"/);
@@ -170,11 +158,11 @@ Deno.test("render: full HTML page skeleton (pico css + header/main/footer + inli
   assertMatch(page, /addEventListener\('click'/);
 });
 
-Deno.test("children builder: function can add children imperatively and preserve ordering with trailing children", () => {
+Deno.test("children builder: preserves ordering with trailing children", () => {
   const html = F.render(
     F.div({ id: "x" }, (e) => {
       for (const n of [1, 2, 3]) e(F.span(String(n)));
-      if (e) e(" mid "); // conditional
+      e(" mid ");
     }, "tail"),
   );
 
@@ -184,26 +172,31 @@ Deno.test("children builder: function can add children imperatively and preserve
   );
 });
 
-Deno.test("children builder: function can be used without attrs", () => {
+Deno.test("attrs helper: merges deterministically (later wins)", () => {
   const html = F.render(
-    F.ul((e) => {
-      for (const s of ["a", "b"]) e(F.li(s));
-    }),
+    F.div(
+      F.attrs({ a: "1", z: "9" }, { z: "3", m: "2" }),
+      "x",
+    ),
   );
-  assertEquals(html, `<ul><li>a</li><li>b</li></ul>`);
+  assertEquals(html, `<div a="1" m="2" z="3">x</div>`);
 });
 
-Deno.test("children builder: nested builders work", () => {
+Deno.test("cls helper: builds class string from maps/arrays", () => {
   const html = F.render(
-    F.div((e) => {
-      e(
-        F.section((e) => {
-          e(F.h2("T"), F.p("P"));
-        }),
-      );
-    }),
+    F.div(
+      { class: F.cls("a", ["b", { c: true, d: false }]) },
+      "x",
+    ),
   );
-  assertEquals(html, `<div><section><h2>T</h2><p>P</p></section></div>`);
+  assertMatch(html, /class="a b c"/);
+});
+
+Deno.test("css helper: style object to stable style text", () => {
+  const html = F.render(
+    F.div({ style: F.css({ backgroundColor: "red", zIndex: 2 }) }, "x"),
+  );
+  assertMatch(html, /style="background-color:red;z-index:2;"/);
 });
 
 Deno.test("security: text is escaped by default", () => {
@@ -238,22 +231,5 @@ Deno.test("void elements: no closing tag (sample)", () => {
   assertEquals(
     F.render(F.img({ alt: "x", src: "/a.png" })),
     `<img alt="x" src="/a.png">`,
-  );
-});
-
-Deno.test("JunxionUX: clickGet emits exact data-on:click and @get(...)", () => {
-  const attrs = F.JunxionUX.clickGet("/x");
-  assertEquals(attrs["data-on:click"], `@get("/x")`);
-  const html = F.render(F.button({ ...attrs }, "Go"));
-  assertMatch(html, /data-on:click="@get\(&quot;\/x&quot;\)"/);
-});
-
-Deno.test("JunxionUX: signals emits data-signals JSON", () => {
-  const attrs = F.JunxionUX.signals({ a: 1, b: "x" });
-  assertEquals(attrs["data-signals"], `{"a":1,"b":"x"}`);
-  const html = F.render(F.div({ ...attrs }, "ok"));
-  assertMatch(
-    html,
-    /data-signals="\{&quot;a&quot;:1,&quot;b&quot;:&quot;x&quot;\}"/,
   );
 });

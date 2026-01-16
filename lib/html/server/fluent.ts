@@ -3,52 +3,63 @@
 // Server-side fluent HTML builder.
 // - Juniors use named tag functions only (we do NOT export el)
 // - Deterministic attribute ordering
-// - Safe-by-default text escaping; explicit raw() for opt-in HTML injection
+// - Safe-by-default text escaping; explicit raw()/trustedRaw() for opt-in HTML injection
+// - Supports imperative child builders anywhere in children lists
 // - Hypermedia helpers emit DataStar-style `data-*` vocabulary (exact attribute names)
 //
 // Note: we intentionally avoid using the upstream project name in identifiers/exports.
 
 import {
   type Attrs,
+  attrs as mergeAttrs,
+  type AttrValue,
   type Child,
-  type ChildAdder,
-  type ChildSpec,
+  children as childrenFn,
+  classNames,
+  each as eachFn,
   escapeHtml,
   flattenChildren,
+  isPlainObject,
   raw,
   type RawHtml,
   serializeAttrs,
+  styleText,
+  trustedRaw,
 } from "../shared.ts";
 
-export { raw };
+export { raw, trustedRaw };
+export type { Attrs, AttrValue, Child, RawHtml };
 
+export const attrs = mergeAttrs;
+export const cls = classNames;
+export const css = styleText;
+export const children = childrenFn;
+export const each = eachFn;
+
+// Minimal explicit type to satisfy "public API must have explicit type"
+// while keeping inference for the implementation.
 export type TagFn = (
-  attrsOrChild?: Attrs | ChildSpec,
-  ...children: ChildSpec[]
+  attrsOrChild?: Attrs | Child,
+  ...children: Child[]
 ) => RawHtml;
 
+// Internal primitive, intentionally not exported.
 const el = (tag: string, ...args: unknown[]) => {
   let attrs: Attrs | undefined;
-  let specs: ChildSpec[];
+  let children: Child[];
 
   if (args.length > 0 && isAttrs(args[0])) {
     attrs = args[0] as Attrs;
-    specs = args.slice(1) as ChildSpec[];
+    children = args.slice(1) as Child[];
   } else {
-    specs = args as ChildSpec[];
-  }
-
-  const children: Child[] = [];
-  const add: ChildAdder = (...c) => {
-    for (const x of c) children.push(x);
-  };
-
-  for (const s of specs) {
-    if (typeof s === "function") (s as (e: ChildAdder) => void)(add);
-    else children.push(s as Child);
+    children = args as Child[];
   }
 
   const attrText = serializeAttrs(attrs);
+
+  // IMPORTANT:
+  // flattenChildren() now executes ChildBuilder callbacks anywhere in the tree
+  // and returns a linear list of (string | RawHtml).
   const flat = flattenChildren(children);
 
   let inner = "";
@@ -57,18 +68,16 @@ const el = (tag: string, ...args: unknown[]) => {
     else inner += c.__rawHtml;
   }
 
-  if (isVoidElement(tag)) return raw(`<${tag}${attrText}>`);
-  return raw(`<${tag}${attrText}>${inner}</${tag}>`);
+  // Void elements never have a closing tag.
+  if (isVoidElement(tag)) return trustedRaw(`<${tag}${attrText}>`);
+  return trustedRaw(`<${tag}${attrText}>${inner}</${tag}>`);
 };
 
 const tag = (name: string): TagFn => (...args: unknown[]) =>
   el(name, ...(args as never[]));
 
 const isAttrs = (v: unknown): v is Attrs => {
-  if (v == null) return false;
-  if (Array.isArray(v)) return false;
-  if (typeof v !== "object") return false;
-  if (typeof v === "function") return false;
+  if (!isPlainObject(v)) return false;
   if ("__rawHtml" in (v as Record<string, unknown>)) return false;
   return true;
 };
@@ -93,15 +102,26 @@ const VOID_ELEMENTS = new Set([
 const isVoidElement = (t: string) => VOID_ELEMENTS.has(t.toLowerCase());
 
 // Convenience primitives
-export const doctype: () => RawHtml = () => raw("<!doctype html>");
-export const text: (s: string) => string = (s) => escapeHtml(s);
+export const doctype: () => RawHtml = () => trustedRaw("<!doctype html>");
 export const comment: (s: string) => RawHtml = (s) =>
-  raw(`<!--${escapeHtml(s)}-->`);
+  trustedRaw(`<!--${escapeHtml(s)}-->`);
 
 // Render helper for HTTP responses and tests
 export const render: (...parts: Array<string | RawHtml>) => string = (
   ...parts
 ) => parts.map((p) => (typeof p === "string" ? p : p.__rawHtml)).join("");
+
+// Safer script/style helpers
+// These exist because <script> and <style> contents should not be HTML-escaped.
+export const scriptJs: (code: string, attrs?: Attrs) => RawHtml = (
+  code,
+  attrs,
+) => script(attrs ?? {}, trustedRaw(code));
+
+export const styleCss: (cssText: string, attrs?: Attrs) => RawHtml = (
+  cssText,
+  attrs,
+) => style(attrs ?? {}, trustedRaw(cssText));
 
 // Hypermedia helpers (DataStar-style attribute vocabulary)
 // We avoid injecting arbitrary expressions. Helpers generate the common patterns so juniors
