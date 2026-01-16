@@ -368,11 +368,11 @@ Deno.test("sseSession basic behavior: send, keepalive, close behavior", async (t
 });
 
 Deno.test(
-  "JxApp router, params, middleware, typed vars, method not allowed, SSE (end-to-end server)",
+  "Router, params, middleware, typed vars, method not allowed, SSE (end-to-end server)",
   async (t) => {
     type State = { prefix: string };
 
-    const app = new Application<State>({ prefix: "p:" }).withVars<
+    const app = Application.sharedState<State>({ prefix: "p:" }).withVars<
       { userId: string }
     >();
 

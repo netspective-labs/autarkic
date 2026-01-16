@@ -1,11 +1,22 @@
 // lib/continuux/http.ts
-//
-// Reusable HTTP server helpers for pure-TypeScript web UIs.
-// - In-memory module bundling (Deno.bundle) with caching
-// - Small response helpers (html/js/text/json)
-// - SSE helpers (safe on disconnect, type-safe events, abort-aware)
-// - Hono-inspired router with full type inference (no "GET /x" key strings)
-// - Typed per-request vars (middleware-friendly) + basic observability hooks
+/**
+ * ContinuUX HTTP utilities (server-side) for pure TypeScript web UIs.
+ *
+ * What this module gives you:
+ * - Small response helpers (html/js/text/json)
+ * - In-memory module bundling (Deno.bundle) with caching
+ * - SSE helpers (safe on disconnect, type-safe events, abort-aware)
+ * - A tiny Hono-inspired router with full type inference (no "GET /x" key strings)
+ * - Typed per-request vars (middleware-friendly) + basic observability hooks
+ *
+ * Important: Application state semantics are explicit.
+ * You must choose one of these when creating an Application:
+ * - sharedState(state): every request sees the same object reference (mutations persist)
+ * - snapshotState(state): each request receives a cloned snapshot (mutations do NOT persist)
+ * - stateFactory(fn): each request receives state produced by a factory (request-scoped, etc.)
+ *
+ * This prevents the classic confusion of “does c.state persist between requests?”
+ */
 
 /* =========================
  * response helpers
@@ -439,6 +450,13 @@ type HandlerCtx<Path extends string, State, Vars extends VarsRecord> = {
   req: Request;
   url: URL;
   params: ParamsOf<Path>;
+
+  /**
+   * Request state as defined by Application state semantics:
+   * - sharedState: shared reference across requests
+   * - snapshotState: cloned snapshot per request
+   * - stateFactory: produced per request
+   */
   state: State;
 
   // Typed per-request vars (middleware-friendly).
@@ -466,9 +484,7 @@ type HandlerCtx<Path extends string, State, Vars extends VarsRecord> = {
     producer: (
       session: SseSession<E>,
       c: HandlerCtx<Path, State, Vars>,
-    ) =>
-      | void
-      | Promise<void>,
+    ) => void | Promise<void>,
     opts?: Omit<SseOptions, "signal">,
   ) => Response;
 };
@@ -556,17 +572,78 @@ async (c, next) => {
   }
 };
 
+/* =========================
+ * Application state semantics (explicit)
+ * ========================= */
+
+export type StateStrategy = "shared" | "snapshot" | "factory";
+
+export type StateProvider<State> = {
+  readonly strategy: StateStrategy;
+  getState: (req: Request) => State;
+};
+
+const defaultClone = <T>(v: T): T => {
+  try {
+    // deno-lint-ignore no-explicit-any
+    return structuredClone(v as any);
+  } catch {
+    return JSON.parse(JSON.stringify(v)) as T;
+  }
+};
+
 export class Application<
   State extends Record<string, unknown> = EmptyRecord,
   Vars extends VarsRecord = EmptyRecord,
 > {
   readonly #routes: CompiledRoute<State, Vars>[] = [];
   readonly #mw: Array<{ base: string; fn: Middleware<State, Vars> }> = [];
+  readonly #stateProvider: StateProvider<State>;
 
-  constructor(readonly state: State = {} as State) {}
+  private constructor(stateProvider: StateProvider<State>) {
+    this.#stateProvider = stateProvider;
+  }
+
+  static sharedState<
+    State extends Record<string, unknown> = EmptyRecord,
+    Vars extends VarsRecord = EmptyRecord,
+  >(state: State): Application<State, Vars> {
+    return new Application<State, Vars>({
+      strategy: "shared",
+      getState: () => state,
+    });
+  }
+
+  static snapshotState<
+    State extends Record<string, unknown> = EmptyRecord,
+    Vars extends VarsRecord = EmptyRecord,
+  >(
+    state: State,
+    opts?: { clone?: (v: State) => State },
+  ): Application<State, Vars> {
+    const clone = opts?.clone ?? defaultClone;
+    return new Application<State, Vars>({
+      strategy: "snapshot",
+      getState: () => clone(state),
+    });
+  }
+
+  static stateFactory<
+    State extends Record<string, unknown> = EmptyRecord,
+    Vars extends VarsRecord = EmptyRecord,
+  >(factory: (req: Request) => State): Application<State, Vars> {
+    return new Application<State, Vars>({
+      strategy: "factory",
+      getState: (req) => factory(req),
+    });
+  }
+
+  stateSemantics(): StateStrategy {
+    return this.#stateProvider.strategy;
+  }
 
   // If you want typed vars, do:
-  //   const app = new JxApp().withVars<{ userId: string }>()
+  //   const app = Application.sharedState(state).withVars<{ userId: string }>()
   withVars<More extends VarsRecord>(): Application<State, Vars & More> {
     return this as unknown as Application<State, Vars & More>;
   }
@@ -646,11 +723,14 @@ export class Application<
     const requestId = genRequestId();
     const vars = Object.create(null) as Vars;
 
+    // Explicit, per-request state creation.
+    const state = this.#stateProvider.getState(req);
+
     const run = (i: number): Promise<Response> => {
       if (i >= mw.length) {
-        return route.handler(req, url, params, this.state, vars, requestId);
+        return route.handler(req, url, params, state, vars, requestId);
       }
-      const ctx = this.#ctx(req, url, params, this.state, vars, requestId);
+      const ctx = this.#ctx(req, url, params, state, vars, requestId);
       const fn = mw[i];
       return Promise.resolve(fn(ctx, () => run(i + 1)));
     };

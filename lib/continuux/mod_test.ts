@@ -189,9 +189,8 @@ Deno.test("continuux: counter e2e (html.ts + interaction-html.ts)", async (t) =>
     );
   };
 
-  // NOTE: Some routers implement c.state as a per-request view/copy.
-  // For test determinism, handlers mutate `appState` (the canonical state).
-  const app = new Application<State, Vars>(appState);
+  // Make the state semantics explicit: shared mutable state across requests.
+  const app = Application.sharedState<State, Vars>(appState);
 
   app.get("/interaction-browser-ua.js", async () => {
     return await cx.server.uaModuleResponse("no-store");
@@ -258,7 +257,7 @@ Deno.test("continuux: counter e2e (html.ts + interaction-html.ts)", async (t) =>
     const r = await cxPostHandler(cx, {
       req: c.req,
       body: bodyU,
-      state: c.state,
+      state: appState,
       vars: c.vars,
       sse: hub,
       handlers: {

@@ -83,8 +83,7 @@ Deno.test("continuux: interaction e2e", async (t) => {
   const sends: SendJs[] = [];
   const posts: CxInbound[] = [];
 
-  const app = new Application();
-
+  const app = Application.sharedState({});
   app.get(
     "/interaction-browser-ua.js",
     async () => await aide.moduleResponse("no-store"),
@@ -140,7 +139,7 @@ Deno.test("continuux: interaction e2e", async (t) => {
 
   const ac = new AbortController();
   const server = Deno.serve(
-    { hostname: "127.0.0.1", port: 0, signal: ac.signal },
+    { hostname: "127.0.0.1", port: 0, signal: ac.signal, onListen: () => {} },
     (req: Request) => app.fetch(req),
   );
   const origin = `http://127.0.0.1:${(server.addr as Deno.NetAddr).port}`;
