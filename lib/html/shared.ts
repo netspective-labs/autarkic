@@ -40,11 +40,10 @@ export function setRawPolicy(policy: RawPolicy): void {
 }
 
 const isDev = (): boolean => {
-  const deno =
-    (globalThis as unknown as {
-      Deno?: { env?: { get?: (k: string) => string | undefined } };
-    })
-      .Deno;
+  const deno = (globalThis as unknown as {
+    Deno?: { env?: { get?: (k: string) => string | undefined } };
+  })
+    .Deno;
   const env = deno?.env?.get?.("DENO_ENV");
   return env !== "production";
 };

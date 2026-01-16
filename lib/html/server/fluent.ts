@@ -5,9 +5,8 @@
 // - Deterministic attribute ordering
 // - Safe-by-default text escaping; explicit raw()/trustedRaw() for opt-in HTML injection
 // - Supports imperative child builders anywhere in children lists
-// - Hypermedia helpers emit DataStar-style `data-*` vocabulary (exact attribute names)
-//
-// Note: we intentionally avoid using the upstream project name in identifiers/exports.
+// - Hypermedia helpers emit an attribute vocabulary and headers that our own
+//   dependency-free browser runtime understands.
 
 import {
   type Attrs,
@@ -37,7 +36,6 @@ export const children = childrenFn;
 export const each = eachFn;
 
 // Minimal explicit type to satisfy "public API must have explicit type"
-// while keeping inference for the implementation.
 export type TagFn = (
   attrsOrChild?: Attrs | Child,
   ...children: Child[]
@@ -57,9 +55,7 @@ const el = (tag: string, ...args: unknown[]) => {
 
   const attrText = serializeAttrs(attrs);
 
-  // IMPORTANT:
-  // flattenChildren() now executes ChildBuilder callbacks anywhere in the tree
-  // and returns a linear list of (string | RawHtml).
+  // flattenChildren() executes ChildBuilder callbacks anywhere in the tree
   const flat = flattenChildren(children);
 
   let inner = "";
@@ -68,7 +64,6 @@ const el = (tag: string, ...args: unknown[]) => {
     else inner += c.__rawHtml;
   }
 
-  // Void elements never have a closing tag.
   if (isVoidElement(tag)) return trustedRaw(`<${tag}${attrText}>`);
   return trustedRaw(`<${tag}${attrText}>${inner}</${tag}>`);
 };
@@ -112,7 +107,6 @@ export const render: (...parts: Array<string | RawHtml>) => string = (
 ) => parts.map((p) => (typeof p === "string" ? p : p.__rawHtml)).join("");
 
 // Safer script/style helpers
-// These exist because <script> and <style> contents should not be HTML-escaped.
 export const scriptJs: (code: string, attrs?: Attrs) => RawHtml = (
   code,
   attrs,
@@ -123,9 +117,8 @@ export const styleCss: (cssText: string, attrs?: Attrs) => RawHtml = (
   attrs,
 ) => style(attrs ?? {}, trustedRaw(cssText));
 
-// Hypermedia helpers (DataStar-style attribute vocabulary)
-// We avoid injecting arbitrary expressions. Helpers generate the common patterns so juniors
-// don’t hand-type attribute names or action strings.
+// Hypermedia helpers (attribute vocabulary + headers)
+// This is implemented by our dependency-free browser runtime.
 const q = (s: string) => JSON.stringify(s);
 const actionExpr = (name: string, uri: string) => `@${name}(${q(uri)})`;
 const on = (eventName: string, expr: string) => ({
@@ -153,7 +146,6 @@ export const JunxionUX = {
     [`data-bind:${path}`]: "",
   }),
 
-  // Response headers (string literals must match the upstream protocol)
   headers: {
     selector: "datastar-selector",
     mode: "datastar-mode",

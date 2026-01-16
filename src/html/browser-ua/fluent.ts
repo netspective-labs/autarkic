@@ -2,6 +2,9 @@
 /// <reference lib="dom.iterable" />
 
 // src/html/browser-ua/fluent.ts
+//
+// Browser-side fluent HTML builder + dependency-free runtime integration.
+// This file has no external dependencies. It wires our local runtime via enhance().
 
 import {
   type Attrs,
@@ -17,6 +20,8 @@ import {
   styleText,
   trustedRaw,
 } from "../../../lib/html/shared.ts";
+
+import { enhance } from "./runtime.ts";
 
 export { raw, trustedRaw };
 export type { Child };
@@ -79,7 +84,7 @@ const el = (tagName: string, ...args: unknown[]) => {
     console.warn(`Void element <${tagName}> should not have children.`);
   }
 
-  // Important: flattenChildren now executes builders, anywhere in the tree.
+  // flattenChildren executes builders anywhere in the tree
   for (const c of flattenChildren(children)) {
     if (typeof c === "string") {
       node.appendChild(document.createTextNode(c));
@@ -146,74 +151,18 @@ export const styleCss = (cssText: string, attrs?: Attrs) => {
   return s;
 };
 
-// Automatic hypermedia runtime integration (unchanged)
-let junxionUxRuntimeModuleUrl =
-  "https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.0-RC.7/bundles/datastar.js";
-
-export const setJunxionUxRuntimeModuleUrl = (url: string) => {
-  junxionUxRuntimeModuleUrl = url;
-};
-
-const looksLikeHypermediaDom = (root: ParentNode) => {
-  const selectors = [
-    "[data-on\\:]",
-    "[data-bind\\:]",
-    "[data-signals]",
-    "[data-signals\\:]",
-    "[data-effect]",
-    "[data-text]",
-    "[data-show]",
-    "[data-class\\:]",
-    "[data-attr\\:]",
-    "[data-computed\\:]",
-    "[data-indicator\\:]",
-    "[data-ignore]",
-    "[data-ignore-morph]",
-  ];
-  return selectors.some((sel) =>
-    (root as Document | Element).querySelector?.(sel)
-  );
-};
-
-let runtimeLoaded: Promise<void> | null = null;
-
-const ensureRuntime = () => {
-  if (runtimeLoaded) return runtimeLoaded;
-  runtimeLoaded = (async () => {
-    await import(junxionUxRuntimeModuleUrl);
-  })();
-  return runtimeLoaded;
-};
-
-const autoIntegrateRuntime = () => {
-  const boot = async () => {
-    if (looksLikeHypermediaDom(document)) await ensureRuntime();
-
-    const mo = new MutationObserver(async (mutations) => {
-      for (const m of mutations) {
-        for (const n of m.addedNodes) {
-          if (!(n instanceof Element)) continue;
-          if (looksLikeHypermediaDom(n)) {
-            await ensureRuntime();
-            return;
-          }
-        }
-      }
-    });
-
-    mo.observe(document.documentElement, { subtree: true, childList: true });
-  };
-
+// Dependency-free runtime auto-integration.
+// We only call enhance() after DOM is available.
+const autoEnhance = () => {
+  const boot = () => enhance({ root: document });
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => void boot(), {
-      once: true,
-    });
+    document.addEventListener("DOMContentLoaded", boot, { once: true });
   } else {
-    void boot();
+    boot();
   }
 };
 
-autoIntegrateRuntime();
+autoEnhance();
 
 // Named HTML tag exports (no el export)
 export const a = tag("a");
