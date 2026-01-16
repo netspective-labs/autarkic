@@ -319,43 +319,6 @@ export const styleCss: (cssText: string, attrs?: Attrs) => RawHtml = (
 // Type-safe custom element tag helper (server)
 export const customElement = (name: `${string}-${string}`): TagFn => tag(name);
 
-// Hypermedia helpers (kept as-is; you can swap internals later)
-const q = (s: string) => JSON.stringify(s);
-const actionExpr = (name: string, uri: string) => `@${name}(${q(uri)})`;
-const on = (eventName: string, expr: string) => ({
-  [`data-on:${eventName}`]: expr,
-});
-
-export const JunxionUX = {
-  on,
-
-  get: (uri: string) => actionExpr("get", uri),
-  post: (uri: string) => actionExpr("post", uri),
-  put: (uri: string) => actionExpr("put", uri),
-  patch: (uri: string) => actionExpr("patch", uri),
-  delete: (uri: string) => actionExpr("delete", uri),
-
-  clickGet: (uri: string) => on("click", actionExpr("get", uri)),
-  clickPost: (uri: string) => on("click", actionExpr("post", uri)),
-  loadGet: (uri: string) => on("load", actionExpr("get", uri)),
-
-  signals: (obj: Record<string, unknown>) => ({
-    "data-signals": JSON.stringify(obj),
-  }),
-
-  bind: (path: string) => ({
-    [`data-bind:${path}`]: "",
-  }),
-
-  headers: {
-    selector: "datastar-selector",
-    mode: "datastar-mode",
-    useViewTransition: "datastar-use-view-transition",
-    onlyIfMissing: "datastar-only-if-missing",
-    request: "Datastar-Request",
-  },
-} as const;
-
 // Full HTML tag set as named exports (no el export)
 export const a: TagFn = tag("a");
 export const abbr: TagFn = tag("abbr");
