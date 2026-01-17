@@ -28,8 +28,9 @@ $ deno task test                         # runs Deno unit tests
 Get a flavor for the code in the initial developer experience (DX) entry points:
 
 ```bash
-$ ./support/dx/hello/counter.ts    # interactive counter increment app
-$ ./support/dx/hello/markdown.ts   # client-side markdown preview app
+$ ./support/dx/hello/counter.ts      # interactive counter (SSR + SSE) increment app
+$ ./support/dx/hello/counter-ce.ts   # interactive counter (SSR + Web Component + SSE) increment app
+$ ./support/dx/hello/markdown.ts     # client-side markdown preview app
 ```
 
 ## Modules
