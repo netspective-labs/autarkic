@@ -33,7 +33,11 @@
     "check": "deno check",
     "fmt": "deno fmt",
     "lint": "deno lint",
-    "test": "deno test -A",
+
+    // tests require Playwright so be sure to run deno task test:install-deps once
+    "test:install-deps": "deno run -A npm:playwright install --with-deps",
+    "test": "deno test -A --unstable-bundle lib/universal/ lib/continuux/",
+
     "bundle:fluent-tags": "deno bundle src/html/browser-ua/fluent.ts -o lib/html/browser-ua/fluent.auto.js",
     "bundle:runtime": "deno bundle src/html/browser-ua/runtime.ts -o lib/html/browser-ua/runtime.auto.js",
     "bundle:hypermedia": "deno bundle lib/html/hypermedia.ts -o lib/html/browser-ua/hypermedia.auto.js",
