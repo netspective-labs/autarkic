@@ -29,7 +29,7 @@
  * How to use it
  * - Use `defaultDesignSystem` or create your own with `createDesignSystem()` to add/override
  *   region variants.
- * - Use `semanticLayout()` to emit a full document (doctype + html/head/body) as a single `RawHtml`.
+ * - Use `semanticLayout()` to emit a full document (doctype + html/head/body) with asset dependencies.
  * - Inside your `shell()` callback, compose regions with `ds.<region>.use(<variant>, opts, init?)`
  *   or `ds.<region>.wrap(init, children)` when you want direct control.
  *
@@ -48,7 +48,7 @@
  *   }),
  * }, ds);
  *
- * console.log(renderPretty(page));
+ * console.log(renderPretty(page.html));
  * ```
  *
  * Extending variants
@@ -678,6 +678,16 @@ export interface LayoutInit<DS extends AnyDesignSystem = DefaultDesignSystem> {
   ) => ShellParts;
 }
 
+export interface LayoutDependency {
+  source: string;
+  mount: string;
+}
+
+export interface LayoutResult {
+  html: DsHtml;
+  dependencies: Iterable<LayoutDependency>;
+}
+
 const themeApi: ThemeApi = {
   htmlClass: (...p) => classNames(...p),
   bodyClass: (...p) => classNames(...p),
@@ -698,7 +708,7 @@ export function semanticLayout<
 >(
   init: LayoutInit<DS>,
   ds: DS = defaultDesignSystem as unknown as DS,
-): DsHtml {
+): LayoutResult {
   const variant = init.variant ?? "app-shell";
 
   const themeParts = (init.theme?.(themeApi) ?? {}) as ThemeParts;
@@ -709,6 +719,10 @@ export function semanticLayout<
     "width=device-width, initial-scale=1";
   const metaColorScheme = init.meta?.colorScheme ?? "light dark";
   const stylesheetHref = init.stylesheetHref ?? "/fluent-ds/semantic.css";
+  const stylesheetSource = stylesheetHref.startsWith("http://") ||
+      stylesheetHref.startsWith("https://")
+    ? stylesheetHref
+    : "lib/universal/fluent-ds-sematic.css";
 
   const parts = init.shell({
     header: ds.header,
@@ -720,32 +734,37 @@ export function semanticLayout<
 
   const bodyNode = buildBody(variant, parts);
 
-  return concatRaw(
-    doctype(),
-    html(
-      attrs(
-        { lang: init.lang ?? "en" },
-        themeParts.htmlAttrs,
-        themeParts.htmlClass ? { class: themeParts.htmlClass } : undefined,
-      ),
-      head(
-        meta({ charset: metaCharset }),
-        meta({ name: "viewport", content: metaViewport }),
-        meta({ name: "color-scheme", content: metaColorScheme }),
-        link({ rel: "stylesheet", href: stylesheetHref }),
-        init.title ? title(init.title) : "",
-        themeParts.head ?? "",
-        extraHead,
-      ),
-      body(
+  return {
+    html: concatRaw(
+      doctype(),
+      html(
         attrs(
-          { class: classNames("ds-body", themeParts.bodyClass) },
-          themeParts.bodyAttrs,
+          { lang: init.lang ?? "en" },
+          themeParts.htmlAttrs,
+          themeParts.htmlClass ? { class: themeParts.htmlClass } : undefined,
         ),
-        bodyNode,
+        head(
+          meta({ charset: metaCharset }),
+          meta({ name: "viewport", content: metaViewport }),
+          meta({ name: "color-scheme", content: metaColorScheme }),
+          link({ rel: "stylesheet", href: stylesheetHref }),
+          init.title ? title(init.title) : "",
+          themeParts.head ?? "",
+          extraHead,
+        ),
+        body(
+          attrs(
+            { class: classNames("ds-body", themeParts.bodyClass) },
+            themeParts.bodyAttrs,
+          ),
+          bodyNode,
+        ),
       ),
     ),
-  );
+    dependencies: [
+      { source: stylesheetSource, mount: stylesheetHref },
+    ],
+  };
 }
 
 function buildBody(variant: LayoutVariant, parts: ShellParts): DsHtml {

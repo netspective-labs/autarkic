@@ -1,6 +1,10 @@
 // lib/universal/fluent-ds-sematic_test.ts
 
 import { assertEquals } from "@std/assert";
+import type { Element, Properties, Root, RootContent } from "hast";
+import { format } from "hast-util-format";
+import { toHtml } from "hast-util-to-html";
+import { visit } from "unist-util-visit";
 import {
   a,
   type BreadcrumbItem,
@@ -312,7 +316,7 @@ Deno.test("semanticLayout(): app-shell", () => {
     }),
   });
 
-  const actual = renderPretty(page).trim();
+  const actual = renderPretty(page.html).trim();
   registerHTML(actual, {
     testCase: "semanticLayout app-shell",
     suggestFileName: "layout-app-shell.html",
@@ -378,7 +382,7 @@ Deno.test("semanticLayout(): centered layout", () => {
     }),
   });
 
-  const actual = renderPretty(page).trim();
+  const actual = renderPretty(page.html).trim();
   registerHTML(actual, {
     testCase: "semanticLayout centered layout",
     suggestFileName: "layout-centered.html",
@@ -438,7 +442,7 @@ Deno.test("semanticLayout(): marketing layout", () => {
     }),
   });
 
-  const actual = renderPretty(page).trim();
+  const actual = renderPretty(page.html).trim();
   registerHTML(actual, {
     testCase: "semanticLayout marketing layout",
     suggestFileName: "layout-marketing.html",
@@ -478,6 +482,51 @@ Deno.test("semanticLayout(): marketing layout", () => {
     </section>
   </body>
 </html>`,
+  );
+});
+
+Deno.test("semanticLayout(): dependencies", () => {
+  const defaultPage = semanticLayout({
+    variant: "app-shell",
+    lang: "en",
+    title: "Deps",
+    shell: ({ header, sidebar, content, rightRail, footer }) => ({
+      header: header.use("basic", { title: "Deps" }),
+      sidebar: sidebar.use("empty", {}),
+      content: content.use("standard", { pageTitle: "Home", body: p("Hello") }),
+      rightRail: rightRail.use("empty", {}),
+      footer: footer.use("empty", {}),
+    }),
+  });
+
+  assertEquals(
+    Array.from(defaultPage.dependencies),
+    [{
+      source: "lib/universal/fluent-ds-sematic.css",
+      mount: "/fluent-ds/semantic.css",
+    }],
+  );
+
+  const cdnPage = semanticLayout({
+    variant: "app-shell",
+    lang: "en",
+    title: "Deps CDN",
+    stylesheetHref: "https://cdn.example.com/fluent.css",
+    shell: ({ header, sidebar, content, rightRail, footer }) => ({
+      header: header.use("basic", { title: "Deps" }),
+      sidebar: sidebar.use("empty", {}),
+      content: content.use("standard", { pageTitle: "Home", body: p("Hello") }),
+      rightRail: rightRail.use("empty", {}),
+      footer: footer.use("empty", {}),
+    }),
+  });
+
+  assertEquals(
+    Array.from(cdnPage.dependencies),
+    [{
+      source: "https://cdn.example.com/fluent.css",
+      mount: "https://cdn.example.com/fluent.css",
+    }],
   );
 });
 
@@ -597,7 +646,7 @@ Deno.test("custom variants: type safety and extended rendering", () => {
     customDesignSystem,
   );
 
-  const actual = renderPretty(page).trim();
+  const actual = renderPretty(page.html).trim();
   registerHTML(actual, {
     testCase: "custom variants marketing layout",
     suggestFileName: "layout-marketing-custom.html",
@@ -637,6 +686,105 @@ Deno.test("custom variants: type safety and extended rendering", () => {
         <section class="ds-footer-inner ds-footer-note"><span>© 2026 Acme</span></section>
       </footer>
     </section>
+  </body>
+</html>`,
+  );
+});
+
+Deno.test("semanticLayout(): HAST transforms before render", () => {
+  const page = semanticLayout({
+    variant: "app-shell",
+    lang: "en",
+    title: "Transformed",
+    shell: ({ header, sidebar, content, rightRail, footer }) => ({
+      header: header.use("basic", { title: "App" }),
+      sidebar: sidebar.use("empty", {}),
+      content: content.use("standard", { pageTitle: "Home", body: p("Hello") }),
+      rightRail: rightRail.use("empty", {}),
+      footer: footer.use("empty", {}),
+    }),
+  });
+
+  const root: Root = {
+    type: "root",
+    children: structuredClone(
+      Array.from(page.html.__nodes ?? []) as RootContent[],
+    ),
+  };
+
+  let sectionCount = 0;
+
+  visit(root, "element", (node: Element) => {
+    const props: Properties = { ...(node.properties ?? {}) };
+
+    if (node.tagName === "html") {
+      props.lang = "es";
+    }
+
+    if (node.tagName === "header") {
+      const cls = typeof props.class === "string" ? props.class : "";
+      props.class = cls ? `${cls} theme-header` : "theme-header";
+    }
+
+    if (node.tagName === "section" && !props.id) {
+      sectionCount += 1;
+      props.id = `section-${sectionCount}`;
+    }
+
+    if (node.tagName === "main") {
+      const cls = typeof props.class === "string" ? props.class : "";
+      props.class = cls ? `${cls} layout-main` : "layout-main";
+    }
+
+    node.properties = props;
+  });
+
+  format(root);
+  const actual = toHtml(root).trim();
+
+  registerHTML(actual, {
+    testCase: "semanticLayout HAST transforms",
+    suggestFileName: "layout-transformed.html",
+  });
+
+  assertEquals(
+    actual.trim(),
+    `<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1" name="viewport">
+    <meta content="light dark" name="color-scheme">
+    <link href="/fluent-ds/semantic.css" rel="stylesheet">
+    <title>Transformed</title>
+  </head>
+  <body class="ds-body">
+    <div class="ds-shell">
+      <header class="ds-header theme-header">
+        <header class="ds-header-inner theme-header"><span class="ds-header-title">App</span></header>
+      </header>
+      <section class="ds-workspace" id="section-1">
+        <nav class="ds-sidebar">
+          <section class="ds-sidebar-inner" id="section-2"></section>
+        </nav>
+        <main class="ds-content layout-main">
+          <section class="ds-content-inner" id="section-3">
+            <header class="ds-page-header theme-header">
+              <section class="ds-page-header-text" id="section-4"><span class="ds-page-title">Home</span></section>
+            </header>
+            <section class="ds-content-body" id="section-5">
+              <p>Hello</p>
+            </section>
+          </section>
+        </main>
+        <aside class="ds-rightRail">
+          <section class="ds-rail-empty" id="section-6"></section>
+        </aside>
+      </section>
+      <footer class="ds-footer">
+        <section class="ds-footer-empty" id="section-7"></section>
+      </footer>
+    </div>
   </body>
 </html>`,
   );
