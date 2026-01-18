@@ -10,9 +10,9 @@
 
     // Hypertext AST (HAST)
     "hast": "npm:@types/hast@^3",
-    "hast-util-to-html": "https://esm.sh/hast-util-to-html@9",
-    "hast-util-format": "https://esm.sh/hast-util-format@1",
-    "hast-util-from-html-isomorphic": "npm:hast-util-from-html-isomorphic@2",
+    "hast-util-to-html": "npm:hast-util-to-html@^9",
+    "hast-util-format": "npm:hast-util-format@^1",
+    "hast-util-from-html-isomorphic": "npm:hast-util-from-html-isomorphic@^2",
 
     // AST utils
     "types/unist": "npm:@types/unist@^3",
