@@ -23,4 +23,4 @@ jobs:
           deno-version: v2.x
 
       - name: Run tests
-        run: deno test --parallel --allow-all --v8-flags="--max-old-space-size=4096"
+        run: deno task test
