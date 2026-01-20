@@ -688,9 +688,7 @@ export function createEnterpriseDesignSystem<
     enterprise: (api, o) =>
       section(
         { class: c("eds-sidebar-inner", o.collapsed && "is-collapsed") },
-        o.subjects?.length
-          ? api.subjectSelector(o.subjects)
-          : "",
+        o.subjects?.length ? api.subjectSelector(o.subjects) : "",
         o.title ? api.sectionTitle(o.title) : "",
         o.sections.map((sectionDef) => api.navSection(sectionDef)),
         o.footer

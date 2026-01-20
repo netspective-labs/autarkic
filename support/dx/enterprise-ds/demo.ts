@@ -216,7 +216,10 @@ document.addEventListener("DOMContentLoaded", () => {
             ),
             section(
               { class: "eds-rail-panel-body eds-quick-actions" },
-              a({ href: "/report", class: "eds-quick-action" }, "Create Report"),
+              a(
+                { href: "/report", class: "eds-quick-action" },
+                "Create Report",
+              ),
               a(
                 { href: "/meeting", class: "eds-quick-action" },
                 "Schedule Meeting",

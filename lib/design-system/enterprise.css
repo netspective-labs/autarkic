@@ -213,8 +213,7 @@ footer {
   flex: 0 0 var(--eds-sidebar-width);
   width: var(--eds-sidebar-width);
   border-right: 1px solid var(--eds-sidebar-line);
-  background:
-    linear-gradient(180deg, rgba(18, 27, 44, 0.96) 0%, #0b1220 100%);
+  background: linear-gradient(180deg, rgba(18, 27, 44, 0.96) 0%, #0b1220 100%);
   overflow: hidden;
   transition: width 0.25s ease, transform 0.25s ease;
 }
@@ -912,8 +911,11 @@ table thead th {
   height: 220px;
   border-radius: 12px;
   border: 1px dashed #d7e2ee;
-  background:
-    linear-gradient(180deg, rgba(99, 102, 241, 0.08) 0%, #ffffff 100%);
+  background: linear-gradient(
+    180deg,
+    rgba(99, 102, 241, 0.08) 0%,
+    #ffffff 100%
+  );
   display: grid;
   place-items: center;
   color: var(--eds-subtle);
