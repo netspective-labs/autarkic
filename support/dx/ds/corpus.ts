@@ -67,7 +67,11 @@ const pageHtml = (): string => {
       ],
       trees: {
         docs: [
-          { label: "Getting Started", href: "/docs/getting-started", active: true },
+          {
+            label: "Getting Started",
+            href: "/docs/getting-started",
+            active: true,
+          },
           { label: "Reference", href: "/docs/reference" },
         ],
         guides: [
@@ -83,7 +87,12 @@ const pageHtml = (): string => {
     toc: () =>
       H.ol(
         H.li(H.a({ href: "#hello-markdown" }, "Hello Markdown")),
-        H.li(H.a({ href: "#try-editing-this-markdown" }, "Try editing this markdown")),
+        H.li(
+          H.a(
+            { href: "#try-editing-this-markdown" },
+            "Try editing this markdown",
+          ),
+        ),
       ),
     pageMeta: () => H.p(H.small("Updated: 2026-01-02")),
     globalNav: () =>

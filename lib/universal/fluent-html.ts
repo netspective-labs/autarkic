@@ -659,9 +659,8 @@ export type UaDepMimeType =
   | "text/plain"
   | string;
 
-export type UaDependency = {
+export type UaDependencyBase = {
   readonly mountPoint: string; // what HTML references, e.g. "/_fds/fluent.css"
-  readonly canonicalSource: string; // "https://..." or "http://..." or "/abs/path/..." (or file:// if you want)
   readonly mimeType: UaDepMimeType;
 
   // optional route controls for the server
@@ -677,12 +676,27 @@ export type UaDependency = {
     readonly allowHeaders?: string;
     readonly allowMethods?: string;
   };
+};
+
+export type UaDependencyReference = UaDependencyBase & {
+  readonly nature: "reference";
+  readonly canonicalSource: string; // "https://..." or "http://..." or "/abs/path/..." (or file:// if you want)
 
   // optional HTML emission hints
   readonly as?: "style" | "script" | "module" | "preload" | "other";
   readonly integrity?: string;
   readonly crossOrigin?: "anonymous" | "use-credentials";
 };
+
+export type UaDependencyContent = UaDependencyBase & {
+  readonly nature: "content";
+  readonly canonicalSource: string; // full inlined content (css/js/etc)
+
+  // optional HTML emission hints
+  readonly as?: "style" | "script" | "module" | "other";
+};
+
+export type UaDependency = UaDependencyReference | UaDependencyContent;
 
 export type UaRoute = UaDependency & {
   readonly normalizedAs: "style" | "script" | "module" | "preload" | "other";
@@ -706,6 +720,26 @@ export function browserUserAgentHeadTags(
 
   return children((e) => {
     for (const r of routes) {
+      if (r.nature === "content") {
+        if (r.normalizedAs === "style") {
+          e(styleCss(r.canonicalSource));
+          continue;
+        }
+
+        if (r.normalizedAs === "script") {
+          e(script({}, r.canonicalSource));
+          continue;
+        }
+
+        if (r.normalizedAs === "module") {
+          e(script({ type: "module" }, r.canonicalSource));
+          continue;
+        }
+
+        e(comment(`ua dep: ${r.mountPoint}`));
+        continue;
+      }
+
       if (r.normalizedAs === "style") {
         e(
           link(

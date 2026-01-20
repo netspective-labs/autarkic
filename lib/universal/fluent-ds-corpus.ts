@@ -288,11 +288,13 @@ export function corpusDesignSystem(dsName = "corpus-ds") {
       {
         mountPoint: picoCssUrl,
         canonicalSource: picoCssUrl,
+        nature: "reference",
         mimeType: "text/css",
       },
       {
         mountPoint: corpusJsUrl,
         canonicalSource: corpusJsUrl,
+        nature: "reference",
         mimeType: "application/javascript",
         as: "module",
       },

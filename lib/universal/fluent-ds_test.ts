@@ -25,11 +25,13 @@ Deno.test("fluent-ds: semantic body-only layout", () => {
     {
       mountPoint: "/_ua/body-only.css",
       canonicalSource: "https://example.test/body-only.css",
+      nature: "reference",
       mimeType: "text/css",
     },
     {
       mountPoint: "/_ua/body-only.js",
       canonicalSource: "https://example.test/body-only.js",
+      nature: "reference",
       mimeType: "application/javascript",
     },
   ];
@@ -81,11 +83,13 @@ Deno.test("fluent-ds: semantic header/main/footer layout", () => {
     {
       mountPoint: "/_ua/header-main-footer.css",
       canonicalSource: "https://example.test/header-main-footer.css",
+      nature: "reference",
       mimeType: "text/css",
     },
     {
       mountPoint: "/_ua/header-main-footer.js",
       canonicalSource: "https://example.test/header-main-footer.js",
+      nature: "reference",
       mimeType: "application/javascript",
     },
   ];
@@ -190,11 +194,13 @@ Deno.test("fluent-ds: full semantic layout with components", () => {
     {
       mountPoint: "/_ua/full-layout.css",
       canonicalSource: "https://example.test/full-layout.css",
+      nature: "reference",
       mimeType: "text/css",
     },
     {
       mountPoint: "/_ua/full-layout.js",
       canonicalSource: "https://example.test/full-layout.js",
+      nature: "reference",
       mimeType: "application/javascript",
     },
   ];

@@ -211,12 +211,14 @@ export function canonicalDesignSystem(dsName = "canonical-ds") {
         {
           mountPoint: "/canonical-ds/canonical.css",
           canonicalSource: import.meta.resolve("./canonical.css"),
+          nature: "reference",
           mimeType: "text/css",
           cache: { maxAgeSeconds: 3600, immutable: true, etag: "strong" },
         },
         {
           mountPoint: "/canonical-ds/canonical.js",
           canonicalSource: import.meta.resolve("./canonical.js"),
+          nature: "reference",
           mimeType: "application/javascript",
           as: "module",
           cache: { maxAgeSeconds: 3600, immutable: true, etag: "strong" },

@@ -64,6 +64,7 @@ export function starterDesignSystem(dsName = "starter-ds") {
       {
         mountPoint: picoCssUrl,
         canonicalSource: picoCssUrl,
+        nature: "reference",
         mimeType: "text/css",
       },
     ])

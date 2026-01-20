@@ -102,7 +102,7 @@
  *
  * A UA dependency includes:
  * - mountPoint: the URL referenced in HTML
- * - canonicalSource: where the asset actually comes from
+ * - canonicalSource: external URL or inlined content (see UaDependency.nature)
  * - mimeType
  * - cache, headers, CORS, and routing metadata
  *
