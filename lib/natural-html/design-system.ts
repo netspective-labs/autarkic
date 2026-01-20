@@ -1,8 +1,9 @@
 /**
- * Fluent Design System (`fluent-ds`)
+ * @module lib/natural-html/design-system.ts
  *
- * This module implements a fluent, type-safe design system runtime that builds
- * HAST (Hypertext AST) nodes using fluent-html primitives.
+ * Natural Design System (Natural DS) is a fluent, type-safe design system runtime
+ * that builds HAST (Hypertext AST) nodes using Natural HTML primitives from
+ * elements.ts.
  *
  * It is not a component library in the traditional React/Vue sense. Instead, it is a
  * structural composition system that models UI as:
@@ -13,7 +14,7 @@
  *
  * The system is intentionally SSR-first and deterministic. It produces HAST
  * (not strings) with no hidden global state, no implicit registries, and no
- * runtime mutation. Rendering is delegated downstream to fluent-html utilities.
+ * runtime mutation. Rendering is delegated downstream to Natural HTML utilities.
  *
  * Most design systems fail developers in two ways:
  *
@@ -24,7 +25,7 @@
  *    Missing regions, misspelled slots, and invalid compositions are only
  *    discovered visually or in production.
  *
- * `fluent-ds` is designed to make *illegal UI states unrepresentable*.
+ * Natural DS is designed to make *illegal UI states unrepresentable*.
  * If a layout or region requires a slot, TypeScript enforces it.
  * If a slot name is invalid, TypeScript rejects it.
  * If something slips through at runtime, the dev-mode runtime checks catch it.

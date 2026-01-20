@@ -1,5 +1,9 @@
-// lib/natural-html/design-system/corpus.ts
-// Corpus Design System: docs + knowledge base layouts/regions.
+/**
+ * @module lib/natural-html/design-system/corpus.ts
+ *
+ * Corpus design system: documentation and knowledge-base layouts and regions
+ * built on Natural DS primitives.
+ */
 import {
   createDesignSystem,
   defineLayout,

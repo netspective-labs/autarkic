@@ -1,3 +1,11 @@
+/**
+ * @module lib/natural-html/patterns.ts
+ *
+ * Shared layout patterns and slot helpers for Natural DS. This module provides
+ * reusable slot specifications (like head slots), convenience builders, and
+ * region helpers built on top of the Natural DS runtime and Natural HTML.
+ */
+
 import {
   defineComponent,
   defineRegion,

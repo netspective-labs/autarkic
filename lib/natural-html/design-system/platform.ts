@@ -1,3 +1,9 @@
+/**
+ * @module lib/natural-html/design-system/platform.ts
+ *
+ * Canonical platform regions, layouts, and slot helpers for Natural DS.
+ */
+
 /* =============================================================================
  * Typical Design System Subjects
  * ============================================================================= */

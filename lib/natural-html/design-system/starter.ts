@@ -1,5 +1,8 @@
-// lib/natural-html/design-system/starter.ts
-// Minimal starter design system using PicoCSS via CDN.
+/**
+ * @module lib/natural-html/design-system/starter.ts
+ *
+ * Minimal starter design system using PicoCSS via CDN.
+ */
 import {
   createDesignSystem,
   defineLayout,
