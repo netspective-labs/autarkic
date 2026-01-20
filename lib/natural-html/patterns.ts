@@ -5,8 +5,8 @@ import {
   SlotBuilder,
   SlotBuilders,
   slots,
-} from "./fluent-ds.ts";
-import * as h from "./fluent-html.ts";
+} from "./design-system.ts";
+import * as h from "./elements.ts";
 
 // deno-lint-ignore no-explicit-any
 type Any = any;

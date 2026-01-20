@@ -29,7 +29,7 @@ http.ts (Application, router, SSE)
 |
 |  HTML + JS responses
 v
-fluent-html.ts + bundle.ts
+elements.ts + bundle.ts
 |
 v
 HTML / JS sent to browser
@@ -48,7 +48,7 @@ Each layer is small, explicit, and replaceable.
 
 ## Module-by-module architecture
 
-### lib/universal/fluent-html.ts
+### lib/natural-html/elements.ts
 
 Role: deterministic HTML generation
 

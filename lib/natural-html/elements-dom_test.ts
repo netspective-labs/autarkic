@@ -1,10 +1,10 @@
 /// <reference lib="dom" />
 /// <reference lib="dom.iterable" />
-// lib/universal/fluent-html-dom_test.ts
+// lib/natural-html/elements-dom_test.ts
 //
 // Deno + Playwright harness that:
 // 1) starts a tiny HTTP server (Deno.serve, Deno 2.x)
-// 2) serves an HTML fixture that uses lib/universal/fluent-html-dom.js
+// 2) serves an HTML fixture that uses lib/natural-html/elements-dom.js
 // 3) loads it in Chromium
 // 4) captures:
 //    - "view source" equivalent: the raw HTTP response body
@@ -12,7 +12,7 @@
 // 5) pretty-prints DOM HTML in the browser via CDN (Prettier) and returns it to Deno
 //
 // Run:
-//   deno test -A lib/universal/fluent-html-dom_test.ts
+//   deno test -A lib/natural-html/elements-dom_test.ts
 
 import { assertEquals } from "@std/assert";
 // deno-lint-ignore no-import-prefix
@@ -46,7 +46,7 @@ function normalizeHtmlForCompare(s: string): string {
 }
 
 async function startServer(): Promise<ServerCtl> {
-  const domLibUrlPath = "/lib/universal/fluent-html-dom.js";
+  const domLibUrlPath = "/lib/natural-html/elements-dom.js";
 
   // CDN pretty printer (Prettier standalone + HTML parser)
   // Note: this requires network access from the browser.
@@ -139,7 +139,7 @@ async function startServer(): Promise<ServerCtl> {
 `;
 
   const domLib = await Deno.readTextFile(
-    new URL("./fluent-html-dom.js", import.meta.url),
+    new URL("./elements-dom.js", import.meta.url),
   );
 
   const handler = (req: Request): Response => {

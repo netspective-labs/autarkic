@@ -182,14 +182,14 @@
  * It is designed to scale from simple pages to large enterprise systems
  * without changing mental models or APIs.
  */
-import * as h from "./fluent-html.ts";
-import type { RawHtml } from "./fluent-html.ts";
+import * as h from "./elements.ts";
+import type { RawHtml } from "./elements.ts";
 import {
   browserUserAgentHeadTags,
   normalizeUaRoute,
   UaDependency,
   UaRoute,
-} from "./fluent-html.ts";
+} from "./elements.ts";
 import type { Element, RootContent } from "hast";
 
 // deno-lint-ignore no-explicit-any

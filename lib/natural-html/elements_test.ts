@@ -1,6 +1,6 @@
-// lib/universal/fluent-html_test.ts
+// lib/natural-html/elements_test.ts
 import { assertEquals } from "@std/assert";
-import * as F from "./fluent-html.ts";
+import * as F from "./elements.ts";
 
 Deno.test(
   "renderPretty: full HTML page skeleton (pico css + header/main/footer + inline js)",

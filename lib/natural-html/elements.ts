@@ -1,53 +1,117 @@
 /**
- * @module lib/universal/fluent-html.ts
+ * @module lib/natural-html/elements.ts
  *
- * A tiny “fluent HTML” builder that produces HAST (Hypertext AST) nodes, and
- * then serializes them to HTML. The AST emitted by this module is strictly
- * HAST-compliant (root/element/text/comment/doctype only), so downstream unified
- * / syntax-tree tooling works cleanly.
+ * Natural HTML is a tiny, functional HTML authoring library for TypeScript.
+ * It is “natural” in the sense that developers who are fluent with functions can
+ * write HTML, page chrome, and design-system primitives as composable functions
+ * without JSX, template strings, or a runtime DOM.
  *
- * What you get:
- * - A typed, ergonomic tag API: `div(...)`, `a(...)`, `table(...)`, etc.
- * - Safe-by-default behavior: plain string children become HAST `text` nodes,
- *   which are escaped by the serializer.
- * - Boolean attribute semantics: `true` emits a boolean attribute, `false/null/undefined` omit.
- * - Compositional helpers: `attrs`, `classNames`, `styleText`, `each`, `children`.
- * - Deterministic minimized and pretty rendering from AST (no stringify then parse).
+ * The core design goal is deterministic, inspectable HTML generation that stays
+ * compatible with the broader syntax-tree ecosystem. Natural HTML builds a
+ * HAST (Hypertext AST) tree and serializes it to HTML, rather than concatenating
+ * strings. The AST emitted by this module is strictly HAST-compliant
+ * (root/element/text/comment/doctype only), so downstream unified / syntax-tree
+ * tooling can process the output cleanly.
  *
- * Raw/trusted content (two distinct use cases):
+ * This module is intended as the foundation for Natural Design System (Natural DS),
+ * where layouts and regions call into Natural HTML to generate HTML consistently.
  *
- * 1) trustedRaw(html) / raw(html):
- *    Use when you have trusted HTML markup that should be inserted as markup.
- *    To keep the AST 100% HAST-compliant, we do NOT emit semistandard `raw` nodes.
- *    Instead, we parse the provided HTML string into actual HAST nodes (fragment mode),
- *    and splice those nodes into the tree.
+ * Major features
  *
- *    - `trustedRaw()` always allows this.
- *    - `raw()` can be blocked by `setRawPolicy({ mode: "dev-strict" })` to catch accidents.
+ * 1) Typed tag API
+ * - Named exports for the full HTML tag set: `div(...)`, `head(...)`, `a(...)`, etc.
+ * - `customElement("my-tag")` for type-safe custom elements.
+ * - Void-element handling: void tags never accept children.
  *
- * 2) trustedRawFriendly`...` (alias: javaScript):
- *    Use for multi-line code/text blocks that must be treated “as-is” (not parsed as HTML).
- *    This is intended for inline `<script>` and `<style>` content, where parsing as HTML
- *    would corrupt valid JavaScript/CSS.
+ * 2) Safe-by-default children model
+ * - Plain strings and numbers become HAST `text` nodes and are escaped by the serializer.
+ * - `null` / `undefined` / `false` children are skipped.
+ * - `true` is skipped (use boolean attributes instead).
+ * - Arrays are flattened.
+ * - Builder callbacks (`ChildBuilder`) may emit children during flattening.
  *
- *    `trustedRawFriendly` returns HAST `text` nodes (not parsed HTML), so content is kept
- *    literally. Serializer will still escape `<` as needed, which is correct for script/style
- *    body text in HTML.
+ * 3) Deterministic output
+ * - Attribute keys are sorted before emission for stable HTML.
+ * - `render()` emits minimized HTML directly from HAST.
+ * - `renderPretty()` formats the HAST tree (via `hast-util-format`) before serializing.
+ * - No “stringify then parse” loop for ordinary element construction.
  *
- * Important: `scriptJs(code)` and `styleCss(cssText)` always embed their content as plain
- * text nodes. They do not parse.
+ * 4) Raw and trusted content (two distinct use cases)
  *
- * Children model:
- * - null/undefined/false are skipped
- * - true is skipped (use boolean attrs instead)
- * - arrays are flattened
- * - builder callbacks are executed during flattening and may emit children
+ * Markup insertion (parsed as HTML):
+ * - `trustedRaw(html)`: parses trusted markup into real HAST nodes (fragment mode),
+ *   and splices those nodes into the tree. This keeps the AST strictly HAST-compliant
+ *   (no semistandard `raw` nodes).
+ * - `raw(html)`: same behavior but can be blocked in dev/test by `setRawPolicy({ mode: "dev-strict" })`
+ *   to catch accidental raw insertion.
  *
- * Output model:
- * - Tag functions return `RawHtml`, a wrapper with both serialized HTML and underlying HAST nodes.
- * - `render()` and `renderPretty()` serialize HAST nodes (pretty uses `hast-util-format`).
+ * Literal text blocks (NOT parsed as HTML):
+ * - `trustedRawFriendly\`...\`` (alias: `javaScript`): for multiline code/text blocks that must
+ *   remain literal. This is intended for inline `<script>` and `<style>` bodies, where parsing
+ *   as HTML would corrupt valid JS/CSS. Output is HAST `text` nodes.
+ * - `scriptJs(code)` and `styleCss(cssText)` always embed content as text nodes (never parsed).
+ *
+ * 5) Composition helpers
+ * - `attrs(...)` to merge attribute objects.
+ * - `classNames(...)` / `cls(...)` to build class strings.
+ * - `styleText(...)` / `css(...)` to build deterministic inline style strings.
+ * - `each(iterable, fn)` to build children from iterables with index support.
+ * - `children(builder)` to author complex child trees with an emitter callback.
+ *
+ * 6) Minimal DOM interop contract
+ * - `DomNodeLike` exists as a structural type (`{ nodeType: number }`) to avoid `lib=dom` coupling.
+ *   Server rendering does not accept DOM nodes as children; if a DOM node slips through, an error is thrown.
+ *
+ * UA Dependencies (design system “user agent dependencies”)
+ *
+ * Natural HTML includes a small convention for describing “user agent dependencies” (UA deps):
+ * external or inline resources that a design system needs in the browser/user agent
+ * (CSS, JavaScript modules, SVGs, fonts, etc.).
+ *
+ * UA deps are declared as data so the server can:
+ * - create routes to serve them (mountPoint routing)
+ * - apply correct MIME types and headers
+ * - control caching, ETag policy, and CORS if needed
+ * - emit the corresponding `<link>` / `<script>` tags into `<head>`
+ *
+ * Key types and helpers:
+ * - `UaDependency`: either a `reference` (served from a canonical source URL/path) or `content` (inlined payload).
+ * - `uaDepCssRef(...)`, `uaDepJsRef(...)`: create reference deps.
+ * - `uaDepCssContent(...)`, `uaDepJsContent(...)`: create inline deps.
+ * - `normalizeUaRoute(dep)`: computes a normalized `as` classification used for HTML emission.
+ * - `browserUserAgentHeadTags(deps)`: emits appropriate `<link rel="stylesheet">`, `<script>`,
+ *   `<script type="module">`, `<link rel="preload">`, or safe inline `<style>/<script>` tags.
+ *
+ * Usage sketch
+ *
+ * ```ts
+ * import * as h from "./natural-html.ts";
+ *
+ * const deps = [
+ *   h.uaDepCssRef("/_natural/app.css", "file:///abs/path/app.css"),
+ *   h.uaDepJsRef("/_natural/app.js", "https://cdn.example/app.js", { as: "module" }),
+ * ];
+ *
+ * const page = h.renderPretty(
+ *   h.doctype(),
+ *   h.html(
+ *     h.head(
+ *       h.title("Hello"),
+ *       h.browserUserAgentHeadTags(deps),
+ *     ),
+ *     h.body(
+ *       h.div({ class: "container" }, "Hello, Natural HTML"),
+ *     ),
+ *   ),
+ * );
+ * ```
+ *
+ * Dependencies
+ * - HAST types from `hast`
+ * - HTML serialization via `hast-util-to-html`
+ * - Pretty formatting via `hast-util-format`
+ * - HTML fragment parsing via `hast-util-from-html-isomorphic`
  */
-
 import type {
   Comment,
   Doctype,

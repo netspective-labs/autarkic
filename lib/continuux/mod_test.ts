@@ -41,7 +41,7 @@ import {
   render,
   script,
   title,
-} from "../universal/fluent-html.ts";
+} from "../natural-html/elements.ts";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 

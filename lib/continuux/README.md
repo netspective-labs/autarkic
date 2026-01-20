@@ -99,7 +99,7 @@ This provides:
 
 Server tests cover:
 
-- HTML generation via fluent-html.ts
+- HTML generation via elements.ts
 - Interaction decoding and dispatch logic
 - SSE session handling
 - HTTP middleware behavior

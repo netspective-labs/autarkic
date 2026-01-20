@@ -39,17 +39,16 @@ $ ./support/dx/enterprise-ds/demo.ts # demo of Enterprise Design System
 
 Junxion UX is organized intentionally by concern, not by runtime.
 
-### `lib/universal`
+### `lib/natural-html`
 
 Modules that are broadly useful across server and client contexts, independent
 of Continuux itself.
 
-- `fluent-html.ts` is dependency-free, type-safe HTML builder for server-side
+- `elements.ts` is dependency-free, type-safe HTML builder for server-side
   rendering and tests. It replaces JSX, templating engines, and DOM mutation
   with explicit, deterministic HTML generation. It is the foundation for all SSR
   in Junxion UX.
-- `fluent-html-dom.ts` is a twin of `fluent-html.ts` for web browser user
-  agents.
+- `elements-dom.js` is a twin of `elements.ts` for web browser user agents.
 - Other universal helpers Utilities that are safe to use anywhere and have no
   browser- or server-specific assumptions.
 

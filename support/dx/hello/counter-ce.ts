@@ -17,7 +17,7 @@
  */
 
 import { Application, textResponse } from "../../../lib/continuux/http.ts";
-import * as H from "../../../lib/universal/fluent-html.ts";
+import * as H from "../../../lib/natural-html/elements.ts";
 
 type State = { count: number };
 type Vars = Record<string, never>;

@@ -9,8 +9,8 @@ import {
   NamingStrategy,
   SlotBuilder,
   slots,
-} from "../universal/fluent-ds.ts";
-import * as h from "../universal/fluent-html.ts";
+} from "../design-system.ts";
+import * as h from "../elements.ts";
 
 /* -----------------------------------------------------------------------------
  * Canonical Regions

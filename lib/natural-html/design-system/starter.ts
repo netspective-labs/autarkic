@@ -1,4 +1,4 @@
-// lib/universal/fluent-ds-starter.ts
+// lib/natural-html/design-system/starter.ts
 // Minimal starter design system using PicoCSS via CDN.
 import {
   createDesignSystem,
@@ -7,9 +7,9 @@ import {
   NamingStrategy,
   RenderCtx,
   slots,
-} from "./fluent-ds.ts";
-import * as h from "./fluent-html.ts";
-import { HeadSlotInput, headSlots, headSlotSpec } from "./fluent-patterns.ts";
+} from "../design-system.ts";
+import * as h from "../elements.ts";
+import { HeadSlotInput, headSlots, headSlotSpec } from "../patterns.ts";
 
 type RenderInput = Record<PropertyKey, never>;
 

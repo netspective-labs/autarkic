@@ -13,7 +13,7 @@
  * and SSE helpers.
  *
  * ContinuUX uses Fluent HTML, not React (or JSX). HTML is generated on the server
- * using `../universal/fluent-html.ts`, which provides a tiny, dependency-free,
+ * using `../natural-html/elements.ts`, which provides a tiny, dependency-free,
  * safe-by-default HTML builder (escaping, deterministic output, optional AST
  * for pretty rendering). This module builds on that foundation to attach
  * hypermedia-style interaction metadata to Fluent HTML output.
@@ -65,7 +65,7 @@
  * - `cxSseRegister()` is a ready-to-plug helper for GET /cx/sse.
  *
  * Relationship to other ContinuUX modules:
- * - `../universal/fluent-html.ts` supplies the HTML builder, attribute typing,
+ * - `../natural-html/elements.ts` supplies the HTML builder, attribute typing,
  *   and safe rendering.
  * - `./http.ts` supplies the Fetch-native router and SSE session primitives.
  * - `./interaction.ts` supplies envelope decoding and browser UA module support.
@@ -76,8 +76,8 @@
  * HTML generation, action validation/dispatch, and SSE-driven interactivity.
  */
 
-import type { Attrs, RawHtml } from "../universal/fluent-html.ts";
-import { script, trustedRaw } from "../universal/fluent-html.ts";
+import type { Attrs, RawHtml } from "../natural-html/elements.ts";
+import { script, trustedRaw } from "../natural-html/elements.ts";
 import type { SseEventMap, SseSession } from "./http.ts";
 import type {
   CxDomEventName,

@@ -20,9 +20,9 @@
 
 import { autoTsJsBundler } from "../../../lib/continuux/bundle.ts";
 import { Application } from "../../../lib/continuux/http.ts";
-import * as H from "../../../lib/universal/fluent-html.ts";
-import { starterDesignSystem } from "../../../lib/universal/fluent-ds-starter.ts";
-import { headSlots } from "../../../lib/universal/fluent-patterns.ts";
+import * as H from "../../../lib/natural-html/elements.ts";
+import { starterDesignSystem } from "../../../lib/natural-html/design-system/starter.ts";
+import { headSlots } from "../../../lib/natural-html/patterns.ts";
 
 type State = Record<string, never>;
 type Vars = Record<string, never>;

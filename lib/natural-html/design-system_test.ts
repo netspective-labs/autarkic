@@ -1,4 +1,4 @@
-// lib/universal/fluent-ds_test.ts
+// lib/natural-html/design-system_test.ts
 import { assertEquals } from "@std/assert";
 import {
   createDesignSystem,
@@ -7,9 +7,9 @@ import {
   NamingStrategy,
   RenderCtx,
   slots,
-} from "./fluent-ds.ts";
-import * as h from "./fluent-html.ts";
-import { breadcrumbs, card } from "./fluent-patterns.ts";
+} from "./design-system.ts";
+import * as h from "./elements.ts";
+import { breadcrumbs, card } from "./patterns.ts";
 
 type RenderInput = Record<PropertyKey, never>;
 

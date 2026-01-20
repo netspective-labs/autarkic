@@ -34,7 +34,7 @@ import {
   small,
   style,
   trustedRaw,
-} from "../../../lib/universal/fluent-html.ts";
+} from "../../../lib/natural-html/elements.ts";
 
 type State = Record<string, never>;
 type Vars = Record<string, never>;

@@ -1,4 +1,4 @@
-// lib/universal/fluent-ds-corpus.ts
+// lib/natural-html/design-system/corpus.ts
 // Corpus Design System: docs + knowledge base layouts/regions.
 import {
   createDesignSystem,
@@ -8,8 +8,8 @@ import {
   RenderCtx,
   SlotBuilder,
   slots,
-} from "./fluent-ds.ts";
-import * as h from "./fluent-html.ts";
+} from "../design-system.ts";
+import * as h from "../elements.ts";
 import {
   DocNavSubject,
   docNavTree,
@@ -19,7 +19,7 @@ import {
   headSlots,
   headSlotSpec,
   selectDocNavTree,
-} from "./fluent-patterns.ts";
+} from "../patterns.ts";
 
 type RenderInput = Record<PropertyKey, never>;
 

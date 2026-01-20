@@ -1,8 +1,8 @@
-// lib/universal/fluent-ds-corpus_test.ts
+// lib/natural-html/design-system/corpus_test.ts
 import { assertEquals } from "@std/assert";
-import * as h from "./fluent-html.ts";
-import { corpusDesignSystem, docPageSlots } from "./fluent-ds-corpus.ts";
-import { headSlots } from "./fluent-patterns.ts";
+import * as h from "../elements.ts";
+import { corpusDesignSystem, docPageSlots } from "./corpus.ts";
+import { headSlots } from "../patterns.ts";
 
 Deno.test("fluent-ds-corpus: doc page layout", () => {
   const ds = corpusDesignSystem();

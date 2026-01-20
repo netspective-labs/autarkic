@@ -1,5 +1,5 @@
 /**
- * @module lib/universal/fluent-ds-enterprise.ts
+ * @module lib/design-system/enterprise.ts
  *
  * Enterprise design system primitives derived from support/rfc/design-system-spec.md.
  * This module provides semantic layout regions (header, sidebar, content, right rail, footer)
@@ -10,7 +10,7 @@ import type {
   Child,
   ClassSpec,
   RawHtml,
-} from "../universal/fluent-html.ts";
+} from "../natural-html/elements.ts";
 
 import {
   a,
@@ -41,7 +41,7 @@ import {
   title,
   trustedRaw,
   ul,
-} from "../universal/fluent-html.ts";
+} from "../natural-html/elements.ts";
 
 /* ------------------------------ Basic types ------------------------------ */
 

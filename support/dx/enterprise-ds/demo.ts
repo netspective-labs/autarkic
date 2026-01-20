@@ -39,7 +39,7 @@ import {
   thead,
   tr,
   ul,
-} from "../../../lib/universal/fluent-html.ts";
+} from "../../../lib/natural-html/elements.ts";
 
 type State = Record<string, never>;
 type Vars = Record<string, never>;

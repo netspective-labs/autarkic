@@ -1,8 +1,8 @@
 /**
- * @module lib/universal/fluent-ds-sematic.ts
+ * @module lib/design-system/semantic.ts
  *
  * A small “semantic design system” layer for building consistent page layouts and
- * regions (header, sidebar, content, right rail, footer) on top of `fluent-html.ts`
+ * regions (header, sidebar, content, right rail, footer) on top of `elements.ts`
  * (HAST-native).
  *
  * What a design system is
@@ -21,7 +21,7 @@
  * styling and automation.
  *
  * HAST-native output model
- * Everything produced is `RawHtml` from `fluent-html.ts`, which carries real HAST nodes
+ * Everything produced is `RawHtml` from `elements.ts`, which carries real HAST nodes
  * (via `__nodes`). This avoids inventing a parallel AST. For “fragments” (groups of nodes),
  * `fragment()` wraps children in `<template>` so the result remains a concrete, deterministic
  * HAST subtree without needing a non-HAST fragment node.
@@ -35,7 +35,7 @@
  *
  * Minimal example
  * ```ts
- * import { semanticLayout, defaultDesignSystem as ds, renderPretty } from "./fluent-ds-sematic.ts";
+ * import { semanticLayout, defaultDesignSystem as ds, renderPretty } from "./semantic.ts";
  *
  * const page = semanticLayout({
  *   title: "My App",
@@ -60,7 +60,7 @@ import type {
   Child,
   ClassSpec,
   RawHtml,
-} from "../universal/fluent-html.ts";
+} from "../natural-html/elements.ts";
 
 import {
   a,
@@ -88,7 +88,7 @@ import {
   title,
   trustedRaw,
   ul,
-} from "../universal/fluent-html.ts";
+} from "../natural-html/elements.ts";
 
 /* ------------------------------ Basic types ------------------------------ */
 
