@@ -119,6 +119,12 @@ const icons = {
   info: svg(
     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>',
   ),
+  check: svg(
+    '<svg class="option-checkmark" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>',
+  ),
+  copy: svg(
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>',
+  ),
 };
 
 const pageHtml = (): string => {
@@ -171,26 +177,37 @@ const pageHtml = (): string => {
             name: "Subject 1",
             icon: icons.grid,
             chevron: icons.chevronsUpDown,
+            triggerId: "subject-trigger",
+            popupId: "subject-popup",
             options: [
               subjectOption(ctx, {
                 title: "Subject 1",
                 description: "Primary subject area",
                 icon: icons.grid,
+                checkmark: icons.check,
+                value: "subject-1",
+                selected: true,
               }),
               subjectOption(ctx, {
                 title: "Subject 2",
                 description: "Secondary subject area",
                 icon: icons.navIcon,
+                checkmark: icons.check,
+                value: "subject-2",
               }),
               subjectOption(ctx, {
                 title: "Subject 3",
                 description: "Tertiary subject area",
                 icon: icons.navIcon,
+                checkmark: icons.check,
+                value: "subject-3",
               }),
               subjectOption(ctx, {
                 title: "Subject 4",
                 description: "Additional subject area",
                 icon: icons.navIcon,
+                checkmark: icons.check,
+                value: "subject-4",
               }),
             ],
           }),
@@ -271,10 +288,6 @@ const pageHtml = (): string => {
             title: "Design System Reference",
             description:
               "A comprehensive guide to all available components, layout regions, and styling patterns in this design system.",
-            actions: [
-              H.button({ class: "action-btn" }, "Edit"),
-              H.button({ class: "action-btn action-btn-primary" }, "Launch"),
-            ],
           }),
           H.section(
             { id: "layout" },
@@ -286,8 +299,17 @@ const pageHtml = (): string => {
             callout(ctx, {
               title: "Layout Grid",
               icon: icons.info,
-              content:
-                "Left Sidebar: 280px fixed, Main Content: flexible, Right TOC: 200px fixed.",
+              variant: "info",
+              content: H.div(
+                H.strong("Left Sidebar:"),
+                " 280px fixed width",
+                H.br(),
+                H.strong("Main Content:"),
+                " Flexible (1fr)",
+                H.br(),
+                H.strong("Right TOC:"),
+                " 200px fixed width",
+              ),
             }),
             subsectionHeading(ctx, { title: "Left Sidebar Regions" }),
             definitionList(ctx, {
@@ -397,18 +419,57 @@ const pageHtml = (): string => {
                 "Use basic blocks for short snippets and enhanced blocks for full examples.",
             }),
             codeBlock(ctx, {
-              content: H.codeTag("deno run -A --unstable-bundle ./app.ts"),
+              content: H.codeTag(
+                H.span({ class: "keyword" }, "const"),
+                " greeting = ",
+                H.span({ class: "string" }, '"Hello, World!"'),
+                ";",
+              ),
             }),
             codeBlockEnhanced(ctx, {
               filename: "natural.ts",
-              language: "ts",
+              language: "TypeScript",
+              languageClass: "ts",
               content: H.pre(
                 H.codeTag(
-                  "export const ds = naturalDesignSystem();\n\n" +
-                    'ds.page("NaturalDoc", {}, { slots: { ... } });',
+                  H.div(
+                    { class: "code-line" },
+                    H.span({ class: "line-number" }, "1"),
+                    H.span(
+                      { class: "line-content" },
+                      H.span({ class: "keyword" }, "export interface"),
+                      " Config {",
+                    ),
+                  ),
+                  H.div(
+                    { class: "code-line highlighted" },
+                    H.span({ class: "line-number" }, "2"),
+                    H.span(
+                      { class: "line-content" },
+                      "  theme: ",
+                      H.span({ class: "string" }, "'light'"),
+                      " | ",
+                      H.span({ class: "string" }, "'dark'"),
+                      ";",
+                    ),
+                  ),
+                  H.div(
+                    { class: "code-line highlighted" },
+                    H.span({ class: "line-number" }, "3"),
+                    H.span(
+                      { class: "line-content" },
+                      "  accentColor: string;",
+                    ),
+                  ),
+                  H.div(
+                    { class: "code-line" },
+                    H.span({ class: "line-number" }, "4"),
+                    H.span({ class: "line-content" }, "}"),
+                  ),
                 ),
               ),
               copyLabel: "Copy",
+              copyIcon: icons.copy,
             }),
           ),
           H.section(
@@ -418,20 +479,51 @@ const pageHtml = (): string => {
               tabs: [
                 {
                   label: "npm",
-                  content: codeBlock(ctx, {
-                    content: H.codeTag("npm install"),
+                  content: codeBlockEnhanced(ctx, {
+                    filename: "Terminal",
+                    language: "bash",
+                    languageClass: "bash",
+                    copyLabel: "Copy",
+                    copyIcon: icons.copy,
+                    content: H.pre(
+                      H.codeTag("npm install package-name"),
+                    ),
                   }),
                 },
                 {
                   label: "pnpm",
-                  content: codeBlock(ctx, {
-                    content: H.codeTag("pnpm install"),
+                  content: codeBlockEnhanced(ctx, {
+                    filename: "Terminal",
+                    language: "bash",
+                    languageClass: "bash",
+                    copyLabel: "Copy",
+                    content: H.pre(
+                      H.codeTag("pnpm add package-name"),
+                    ),
                   }),
                 },
                 {
                   label: "yarn",
-                  content: codeBlock(ctx, {
-                    content: H.codeTag("yarn install"),
+                  content: codeBlockEnhanced(ctx, {
+                    filename: "Terminal",
+                    language: "bash",
+                    languageClass: "bash",
+                    copyLabel: "Copy",
+                    content: H.pre(
+                      H.codeTag("yarn add package-name"),
+                    ),
+                  }),
+                },
+                {
+                  label: "bun",
+                  content: codeBlockEnhanced(ctx, {
+                    filename: "Terminal",
+                    language: "bash",
+                    languageClass: "bash",
+                    copyLabel: "Copy",
+                    content: H.pre(
+                      H.codeTag("bun add package-name"),
+                    ),
                   }),
                 },
               ],
@@ -443,6 +535,7 @@ const pageHtml = (): string => {
             callout(ctx, {
               title: "Pro Tip",
               icon: icons.info,
+              variant: "tip",
               content: "Use the search bar to quickly jump to any component.",
             }),
           ),
@@ -482,10 +575,13 @@ const pageHtml = (): string => {
                 {
                   title: "What is Natural DS?",
                   content: "A structured DS for docs.",
+                  icon: icons.chevronDown,
+                  open: true,
                 },
                 {
                   title: "How is CSS handled?",
                   content: "Styles are component-scoped.",
+                  icon: icons.chevronDown,
                 },
               ],
             }),
