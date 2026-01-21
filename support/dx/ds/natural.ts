@@ -399,21 +399,24 @@ const pageHtml = (): string => {
             exampleWrapper(ctx, {
               label: "Type Scale",
               content: H.div(
-                H.h1({
-                  style: "font-size:32px; font-weight:700; margin-bottom:8px;",
-                }, "Page Title (32px/700)"),
-                H.h2({
-                  style: "font-size:22px; font-weight:600; margin-bottom:8px;",
-                }, "Section Heading (22px/600)"),
-                H.h3({
-                  style: "font-size:18px; font-weight:600; margin-bottom:8px;",
-                }, "Subsection (18px/600)"),
-                H.p(
-                  { style: "font-size:15px; margin-bottom:8px;" },
-                  "Body text paragraph (15px)",
+                H.h1(
+                  { class: "type-scale-title" },
+                  "Page Title (32px/700)",
+                ),
+                H.h2(
+                  { class: "type-scale-section" },
+                  "Section Heading (22px/600)",
+                ),
+                H.h3(
+                  { class: "type-scale-subsection" },
+                  "Subsection (18px/600)",
                 ),
                 H.p(
-                  { style: "font-size:13px; color:#737373;" },
+                  { class: "type-scale-body" },
+                  "Body text paragraph (15px/normal)",
+                ),
+                H.p(
+                  { class: "type-scale-small" },
                   "Small text for captions (13px)",
                 ),
               ),

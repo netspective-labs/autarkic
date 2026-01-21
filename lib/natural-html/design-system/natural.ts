@@ -994,6 +994,29 @@ const contentStyles: ComponentStylesheets = [
       lineHeight: 1.8,
       marginBottom: "20px",
     },
+    "type-scale-title": {
+      fontSize: "32px",
+      fontWeight: 700,
+      marginBottom: "8px",
+    },
+    "type-scale-section": {
+      fontSize: "22px",
+      fontWeight: 600,
+      marginBottom: "8px",
+    },
+    "type-scale-subsection": {
+      fontSize: "18px",
+      fontWeight: 600,
+      marginBottom: "8px",
+    },
+    "type-scale-body": {
+      fontSize: "15px",
+      marginBottom: "8px",
+    },
+    "type-scale-small": {
+      fontSize: "13px",
+      color: "#737373",
+    },
     "feature-grid": {
       display: "grid",
       gridTemplateColumns: "repeat(2, 1fr)",
@@ -1949,16 +1972,25 @@ export type ColorSwatchProps = {
 export const colorSwatch = defineComponent<ColorSwatchProps, RenderInput>(
   "ColorSwatch",
   contentStyles,
-  (_ctx, props) =>
-    h.div(
+  (ctx, props) => {
+    const previewId = ctx.naming.elemIdValue(
+      `color-preview-${normalizeTabId(props.name)}-${normalizeTabId(props.value)}`,
+      "component",
+    );
+    return h.div(
       { class: "color-swatch" },
-      h.div({ class: "color-preview", style: `background:${props.value};` }),
+      h.div({
+        class: "color-preview",
+        id: previewId,
+        style: `background: ${props.value}`,
+      }),
       h.div(
         { class: "color-info" },
         h.div({ class: "color-name" }, props.name),
         h.div({ class: "color-value" }, props.value),
       ),
-    ),
+    );
+  },
 );
 
 export type ColorGridProps<Ctx extends object = RenderInput> = {
