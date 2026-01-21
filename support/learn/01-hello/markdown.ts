@@ -14,7 +14,7 @@
  *   deno run -A --unstable-bundle support/learn/01-hello/markdown.ts
  *
  * Then open:
- *   http://127.0.0.1:8000
+ *   http://127.0.0.1:7690
  */
 
 import { autoTsJsBundler } from "../../../lib/continuux/bundle.ts";
@@ -115,4 +115,4 @@ app.get("/example.md", () =>
     headers: { "content-type": "text/markdown; charset=utf-8" },
   }));
 
-app.serve();
+app.serve({ port: 7690 });

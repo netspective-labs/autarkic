@@ -11,7 +11,7 @@
  *   deno run -A --unstable-bundle support/learn/03-natural-ds/hello.ts
  *
  * Then open:
- *   http://127.0.0.1:8000
+ *   http://127.0.0.1:7331
  */
 
 import { Application } from "../../../lib/continuux/http.ts";
@@ -122,4 +122,4 @@ app.get("/", () =>
     headers: { "content-type": "text/html; charset=utf-8" },
   }));
 
-app.serve();
+app.serve({ port: 7331 });

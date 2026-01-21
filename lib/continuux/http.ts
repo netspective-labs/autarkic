@@ -1136,7 +1136,12 @@ export class Application<
     }
   }
 
-  serve(options?: Deno.ServeOptions): void {
+  serve(
+    options?: Pick<
+      Parameters<typeof Deno.serve>[0],
+      "port" | "hostname" | "onListen"
+    >,
+  ): void {
     Deno.serve(options ?? {}, (req) => this.fetch(req));
   }
 

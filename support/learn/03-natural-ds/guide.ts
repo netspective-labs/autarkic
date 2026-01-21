@@ -6,7 +6,7 @@
  *   deno run -A --unstable-bundle support/learn/03-natural-ds/guide.ts
  *
  * Then open:
- *   http://127.0.0.1:8000
+ *   http://127.0.0.1:7599
  */
 import { Application } from "../../../lib/continuux/http.ts";
 import {
@@ -1025,4 +1025,4 @@ app.get("/", () =>
     headers: { "content-type": "text/html; charset=utf-8" },
   }));
 
-app.serve();
+app.serve({ port: 7599 });

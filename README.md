@@ -28,11 +28,19 @@ $ deno task test                         # runs Deno unit tests
 Get a flavor for the code in the initial developer experience (DX) entry points:
 
 ```bash
+$ ./support/learn/index.ts                     # launch the "Learning Resources Server"
+```
+
+You can also run each one individually:
+
+```bash
 $ ./support/learn/01-hello/counter.ts          # interactive counter (SSR + SSE) increment app
 $ ./support/learn/01-hello/counter-ce.ts       # interactive counter (SSR + Web Component + SSE) increment app
 $ ./support/learn/01-hello/markdown.ts         # client-side markdown preview app with custom HTML
+
 $ ./support/learn/02-starter-ds/starter-ds.ts  # client-side markdown preview app with Starter DS
 
+$ ./support/learn/03-natural-ds/hello.ts       # static text with Natural DS
 $ ./support/learn/03-natural-ds/hello-fancy.ts # client-side markdown preview app with Natural DS
 $ ./support/learn/03-natural-ds/guide.ts       # demo of full Natural Design System
 ```
