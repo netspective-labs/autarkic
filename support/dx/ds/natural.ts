@@ -418,6 +418,10 @@ const pageHtml = (): string => {
               content:
                 "Use basic blocks for short snippets and enhanced blocks for full examples.",
             }),
+            H.div(
+              { id: "code-basic" },
+              subsectionHeading(ctx, { title: "Basic Usage" }),
+            ),
             codeBlock(ctx, {
               content: H.codeTag(
                 H.span({ class: "keyword" }, "const"),
@@ -426,6 +430,10 @@ const pageHtml = (): string => {
                 ";",
               ),
             }),
+            H.div(
+              { id: "code-enhanced" },
+              subsectionHeading(ctx, { title: "Enhanced Block" }),
+            ),
             codeBlockEnhanced(ctx, {
               filename: "natural.ts",
               language: "TypeScript",
@@ -532,11 +540,37 @@ const pageHtml = (): string => {
           H.section(
             { id: "callouts" },
             sectionHeading(ctx, { title: "Callouts", href: "#callouts" }),
+            H.div(
+              { id: "callout-default" },
+              subsectionHeading(ctx, { title: "Default" }),
+            ),
             callout(ctx, {
-              title: "Pro Tip",
+              title: "Warning",
+              icon: icons.info,
+              content:
+                "Use callouts sparingly to highlight important information.",
+            }),
+            H.div(
+              { id: "callout-info" },
+              subsectionHeading(ctx, { title: "Info Variant" }),
+            ),
+            callout(ctx, {
+              title: "Info",
+              icon: icons.info,
+              variant: "info",
+              content:
+                "Use .callout.info for additional context or explanations.",
+            }),
+            H.div(
+              { id: "callout-tip" },
+              subsectionHeading(ctx, { title: "Tip Variant" }),
+            ),
+            callout(ctx, {
+              title: "Tip",
               icon: icons.info,
               variant: "tip",
-              content: "Use the search bar to quickly jump to any component.",
+              content:
+                "Use .callout.tip for best practices and recommendations.",
             }),
           ),
           H.section(
@@ -623,12 +657,27 @@ const pageHtml = (): string => {
           H.section(
             { id: "tables" },
             sectionHeading(ctx, { title: "API Tables", href: "#tables" }),
+            H.div(
+              { id: "table-props" },
+              subsectionHeading(ctx, { title: "Props Table" }),
+            ),
             apiTable(ctx, {
               head: ["Prop", "Type", "Default"],
               rows: [
                 ["title", "string", "n/a"],
                 ["description", "string", "n/a"],
                 ["actions", "Content[]", "[]"],
+              ],
+            }),
+            H.div(
+              { id: "table-events" },
+              subsectionHeading(ctx, { title: "Events Table" }),
+            ),
+            apiTable(ctx, {
+              head: ["Event", "Type", "Description"],
+              rows: [
+                ["onOpen", "function", "Emitted on open"],
+                ["onClose", "function", "Emitted on close"],
               ],
             }),
           ),
@@ -671,7 +720,7 @@ const pageHtml = (): string => {
           title: "On this page",
           items: [
             tocLink(ctx, {
-              label: "Layout Structure",
+              label: "Introduction",
               href: "#layout",
               active: true,
             }),
@@ -679,13 +728,28 @@ const pageHtml = (): string => {
             tocLink(ctx, { label: "Typography", href: "#typography" }),
             tocLink(ctx, { label: "Spacing", href: "#spacing" }),
             tocLink(ctx, { label: "Code Blocks", href: "#code-blocks" }),
+            tocLink(ctx, {
+              label: "Basic Usage",
+              href: "#code-basic",
+              nested: true,
+            }),
+            tocLink(ctx, {
+              label: "Enhanced Block",
+              href: "#code-enhanced",
+              nested: true,
+            }),
             tocLink(ctx, { label: "Tabs", href: "#tabs" }),
             tocLink(ctx, { label: "Callouts", href: "#callouts" }),
+            tocLink(ctx, { label: "Default", href: "#callout-default", nested: true }),
+            tocLink(ctx, { label: "Info Variant", href: "#callout-info", nested: true }),
+            tocLink(ctx, { label: "Tip Variant", href: "#callout-tip", nested: true }),
             tocLink(ctx, { label: "Feature Cards", href: "#cards" }),
             tocLink(ctx, { label: "Accordion", href: "#accordion" }),
             tocLink(ctx, { label: "File Tree", href: "#file-tree" }),
             tocLink(ctx, { label: "Steps", href: "#steps" }),
             tocLink(ctx, { label: "API Tables", href: "#tables" }),
+            tocLink(ctx, { label: "Props Table", href: "#table-props", nested: true }),
+            tocLink(ctx, { label: "Events Table", href: "#table-events", nested: true }),
             tocLink(ctx, { label: "Badges", href: "#badges" }),
             tocLink(ctx, { label: "Keyboard Shortcuts", href: "#keyboard" }),
           ],

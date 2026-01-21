@@ -2496,121 +2496,131 @@ export function naturalDesignSystem(dsName = "natural-ds") {
     ],
     scripts: [
       h.scriptJs(`
-        document.querySelectorAll(".tab-button").forEach((button) => {
-          button.addEventListener("click", () => {
-            const tabId = button.dataset.tab;
-            const container = button.closest(".tabs-container");
-            if (!container || !tabId) return;
+        window.addEventListener("DOMContentLoaded", () => {
+          document.querySelectorAll(".tab-button").forEach((button) => {
+            button.addEventListener("click", () => {
+              const tabId = button.dataset.tab;
+              const container = button.closest(".tabs-container");
+              if (!container || !tabId) return;
 
-            container.querySelectorAll(".tab-button").forEach((btn) => {
-              btn.classList.remove("active");
+              container.querySelectorAll(".tab-button").forEach((btn) => {
+                btn.classList.remove("active");
+              });
+              button.classList.add("active");
+
+              container.querySelectorAll(".tab-content").forEach((content) => {
+                content.classList.remove("active");
+              });
+              const next = container.querySelector("#tab-" + tabId);
+              if (next) next.classList.add("active");
             });
-            button.classList.add("active");
+          });
 
-            container.querySelectorAll(".tab-content").forEach((content) => {
-              content.classList.remove("active");
+          document.querySelectorAll(".accordion-header").forEach((header) => {
+            header.addEventListener("click", () => {
+              const item = header.closest(".accordion-item");
+              if (item) item.classList.toggle("open");
             });
-            const next = container.querySelector("#tab-" + tabId);
-            if (next) next.classList.add("active");
           });
-        });
 
-        document.querySelectorAll(".accordion-header").forEach((header) => {
-          header.addEventListener("click", () => {
-            const item = header.closest(".accordion-item");
-            if (item) item.classList.toggle("open");
-          });
-        });
+          document.querySelectorAll(".code-copy-btn").forEach((button) => {
+            button.addEventListener("click", async () => {
+              const codeBlock = button.closest(".code-block-enhanced");
+              if (!codeBlock) return;
+              const code = codeBlock.querySelector("code")?.textContent ?? "";
 
-        document.querySelectorAll(".code-copy-btn").forEach((button) => {
-          button.addEventListener("click", async () => {
-            const codeBlock = button.closest(".code-block-enhanced");
-            if (!codeBlock) return;
-            const code = codeBlock.querySelector("code")?.textContent ?? "";
-
-            try {
-              await navigator.clipboard.writeText(code);
-              const originalText = button.innerHTML;
-              button.innerHTML = "Copied!";
-              setTimeout(() => {
-                button.innerHTML = originalText;
-              }, 2000);
-            } catch (err) {
-              console.error("Failed to copy:", err);
-            }
-          });
-        });
-
-        const sections = document.querySelectorAll("section[id]");
-        const tocLinks = document.querySelectorAll(".toc-link");
-
-        const observerOptions = { rootMargin: "-20% 0% -80% 0%" };
-        const observer = new IntersectionObserver((entries) => {
-          entries.forEach((entry) => {
-            if (!entry.isIntersecting) return;
-            const id = entry.target.getAttribute("id");
-            tocLinks.forEach((link) => {
-              link.classList.remove("active");
-              if (link.getAttribute("href") === "#" + id) {
-                link.classList.add("active");
+              try {
+                await navigator.clipboard.writeText(code);
+                const originalText = button.innerHTML;
+                button.innerHTML = "Copied!";
+                setTimeout(() => {
+                  button.innerHTML = originalText;
+                }, 2000);
+              } catch (err) {
+                console.error("Failed to copy:", err);
               }
             });
           });
-        }, observerOptions);
 
-        sections.forEach((section) => observer.observe(section));
+          const tocLinks = document.querySelectorAll(".toc-link");
+          const tocTargets = Array.from(tocLinks)
+            .map((link) => {
+              const href = link.getAttribute("href");
+              if (!href || !href.startsWith("#")) return null;
+              return document.querySelector(href);
+            })
+            .filter((el) => el);
 
-        document.querySelectorAll(".nav-toggle").forEach((toggle) => {
-          toggle.addEventListener("click", () => {
-            const expanded = toggle.getAttribute("aria-expanded") === "true";
-            toggle.setAttribute("aria-expanded", (!expanded).toString());
-            const children = toggle.nextElementSibling;
-            if (children && children.classList.contains("nav-children")) {
-              children.style.display = expanded ? "none" : "flex";
-            }
-          });
-        });
-
-        const subjectTrigger = document.getElementById("subject-trigger");
-        const subjectPopup = document.getElementById("subject-popup");
-
-        if (subjectTrigger && subjectPopup) {
-          subjectTrigger.addEventListener("click", (event) => {
-            event.stopPropagation();
-            const isOpen = subjectPopup.classList.contains("open");
-            subjectPopup.classList.toggle("open");
-            subjectTrigger.setAttribute("aria-expanded", (!isOpen).toString());
-          });
-
-          document.addEventListener("click", (event) => {
-            const target = event.target;
-            if (
-              target instanceof Node &&
-              !subjectPopup.contains(target) &&
-              !subjectTrigger.contains(target)
-            ) {
-              subjectPopup.classList.remove("open");
-              subjectTrigger.setAttribute("aria-expanded", "false");
-            }
-          });
-
-          document.querySelectorAll(".subject-option").forEach((option) => {
-            option.addEventListener("click", () => {
-              document.querySelectorAll(".subject-option").forEach((opt) => {
-                opt.classList.remove("selected");
-                opt.querySelector(".option-icon")?.classList.remove("active");
+          const observerOptions = { rootMargin: "-20% 0% -80% 0%" };
+          const observer = new IntersectionObserver((entries) => {
+            entries.forEach((entry) => {
+              if (!entry.isIntersecting) return;
+              const id = entry.target.getAttribute("id");
+              tocLinks.forEach((link) => {
+                link.classList.remove("active");
+                if (link.getAttribute("href") === "#" + id) {
+                  link.classList.add("active");
+                }
               });
-              option.classList.add("selected");
-              option.querySelector(".option-icon")?.classList.add("active");
-              const title =
-                option.querySelector(".option-title")?.textContent ?? "";
-              const name = document.querySelector(".subject-selector-name");
-              if (name) name.textContent = title;
-              subjectPopup.classList.remove("open");
-              subjectTrigger.setAttribute("aria-expanded", "false");
+            });
+          }, observerOptions);
+
+          tocTargets.forEach((target) => {
+            if (target) observer.observe(target);
+          });
+
+          document.querySelectorAll(".nav-toggle").forEach((toggle) => {
+            toggle.addEventListener("click", () => {
+              const expanded = toggle.getAttribute("aria-expanded") === "true";
+              toggle.setAttribute("aria-expanded", (!expanded).toString());
+              const children = toggle.nextElementSibling;
+              if (children && children.classList.contains("nav-children")) {
+                children.style.display = expanded ? "none" : "flex";
+              }
             });
           });
-        }
+
+          const subjectTrigger = document.getElementById("subject-trigger");
+          const subjectPopup = document.getElementById("subject-popup");
+
+          if (subjectTrigger && subjectPopup) {
+            subjectTrigger.addEventListener("click", (event) => {
+              event.stopPropagation();
+              const isOpen = subjectPopup.classList.contains("open");
+              subjectPopup.classList.toggle("open");
+              subjectTrigger.setAttribute("aria-expanded", (!isOpen).toString());
+            });
+
+            document.addEventListener("click", (event) => {
+              const target = event.target;
+              if (
+                target instanceof Node &&
+                !subjectPopup.contains(target) &&
+                !subjectTrigger.contains(target)
+              ) {
+                subjectPopup.classList.remove("open");
+                subjectTrigger.setAttribute("aria-expanded", "false");
+              }
+            });
+
+            document.querySelectorAll(".subject-option").forEach((option) => {
+              option.addEventListener("click", () => {
+                document.querySelectorAll(".subject-option").forEach((opt) => {
+                  opt.classList.remove("selected");
+                  opt.querySelector(".option-icon")?.classList.remove("active");
+                });
+                option.classList.add("selected");
+                option.querySelector(".option-icon")?.classList.add("active");
+                const title =
+                  option.querySelector(".option-title")?.textContent ?? "";
+                const name = document.querySelector(".subject-selector-name");
+                if (name) name.textContent = title;
+                subjectPopup.classList.remove("open");
+                subjectTrigger.setAttribute("aria-expanded", "false");
+              });
+            });
+          }
+        });
       `),
     ],
   });
