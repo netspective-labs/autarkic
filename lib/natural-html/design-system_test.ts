@@ -514,3 +514,65 @@ Deno.test("fluent-ds: css style emit strategies", async (t) => {
     assertEquals(dep.canonicalSource, cssText);
   });
 });
+
+Deno.test("fluent-ds: script contributions emit by hints", () => {
+  type EmptyProps = Record<string, never>;
+
+  const widgetScript = h.javaScript`
+    console.log("widget");
+  `;
+
+  const widget = defineComponent<EmptyProps>(
+    "Widget",
+    {
+      scripts: [
+        {
+          code: widgetScript,
+          hints: {
+            placement: "body-end",
+            identity: { kind: "name", value: "widget-script" },
+          },
+        },
+      ],
+    },
+    (_ctx) => h.div("Widget"),
+  );
+
+  const layoutScript = h.javaScript`
+    console.log("layout");
+  `;
+
+  const demoLayout = defineLayout({
+    name: "ScriptDemo",
+    slots: slots({ required: ["content"] as const }),
+    scripts: [
+      {
+        code: layoutScript,
+        hints: {
+          placement: "head",
+          identity: { kind: "name", value: "layout-script" },
+        },
+      },
+    ],
+    render: (_ctx, _api, s) => h.div(h.main(s.content(_ctx))),
+  });
+
+  const ds = createDesignSystem<RenderInput>("script-demo", naming)
+    .policies({ wrappers: { enabled: false } })
+    .layout(demoLayout)
+    .build();
+
+  const html = h.render(
+    ds.page("ScriptDemo", {}, {
+      slots: {
+        content: (ctx) => widget(ctx, {}),
+      },
+      scriptEmitStrategy: { mode: "hints" },
+    }),
+  );
+
+  assertEquals(
+    html.trim(),
+    `<!doctype html><html><head><script>console.log("layout");</script></head><body><div><main><div>Widget</div></main></div><script>console.log("widget");</script></body></html>`,
+  );
+});

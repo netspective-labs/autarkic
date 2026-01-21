@@ -247,6 +247,7 @@ type RenderCtxBase<N extends NamingStrategy = NamingStrategy> = {
   readonly cls: (...parts: h.ClassSpec[]) => string;
   readonly css: typeof h.styleText;
   readonly componentStyles: ComponentStyleRegistry;
+  readonly scripts: ScriptRegistry;
   readonly trace: TraceSink;
   readonly policy: DsPolicies;
 };
@@ -365,6 +366,7 @@ export type RegionDef<
   readonly kind: "region";
   readonly name: Name;
   readonly slots: Spec;
+  readonly scripts?: ScriptContributionsDef<Ctx, NS>;
   readonly render: (
     ctx: RenderCtx<Ctx, NS>,
     slots: SlotBuilders<Spec, Ctx, NS>,
@@ -381,6 +383,7 @@ export type LayoutDef<
   readonly name: Name;
   readonly slots: Spec;
   readonly headSlots?: SlotSpec<string, string>;
+  readonly scripts?: ScriptContributionsDef<Ctx, NS>;
   readonly render: (
     ctx: RenderCtx<Ctx, NS>,
     api: DsApi<Any, Any, Ctx, NS>,
@@ -438,7 +441,10 @@ export type Component<
     ctx: RenderCtx<Ctx, NS>,
     props: Props,
   ) => RawHtml)
-  & { readonly stylesheets?: ComponentStylesheets };
+  & {
+    readonly stylesheets?: ComponentStylesheets;
+    readonly scripts?: ScriptContributions;
+  };
 
 export type CssStyleObject = Readonly<
   Record<string, string | number | null | undefined | false>
@@ -451,12 +457,68 @@ export type ComponentStylesheet<Classes extends string = string> = Readonly<
 export type ComponentStylesheets<Classes extends string = string> =
   readonly ComponentStylesheet<Classes>[];
 
+export type ScriptPlacementHint = "head" | "body-end";
+export type ScriptEmitHint = "inline" | "ua-dep";
+
+export type ScriptIdentityHint =
+  | { readonly kind: "name"; readonly value: string }
+  | { readonly kind: "hash" }
+  | { readonly kind: "none" };
+
+export type ScriptHints = {
+  readonly placement?: ScriptPlacementHint;
+  readonly emit?: ScriptEmitHint;
+  readonly identity?: ScriptIdentityHint;
+  readonly as?: "script" | "module";
+  readonly attrs?: h.Attrs;
+};
+
+export type ScriptContribution = {
+  readonly code: RawHtml | string;
+  readonly hints?: ScriptHints;
+};
+
+export type ScriptContributions = readonly ScriptContribution[];
+
+export type ScriptEmitDecision = {
+  readonly placement?: ScriptPlacementHint;
+  readonly emit?: ScriptEmitHint | "skip";
+  readonly identity?: ScriptIdentityHint;
+};
+
+export type ScriptEmitStrategy = {
+  readonly mode?: "skip" | "hints" | "inline" | "ua-dep";
+  readonly placement?: ScriptPlacementHint;
+  readonly resolve?: (entry: RegisteredScript) => ScriptEmitDecision;
+};
+
 type ComponentStyleRegistry = {
   readonly register: (
     componentName: string,
     stylesheets: ComponentStylesheets,
   ) => void;
   readonly cssText: () => string;
+};
+
+type ScriptContributionsDef<Ctx extends object, NS extends NamingStrategy> =
+  | ScriptContributions
+  | ((ctx: RenderCtx<Ctx, NS>) => ScriptContributions);
+
+type ScriptOwnerKind = "component" | "region" | "layout";
+
+type RegisteredScript = {
+  readonly ownerKind: ScriptOwnerKind;
+  readonly ownerName: string;
+  readonly contribution: ScriptContribution;
+};
+
+type ScriptRegistry = {
+  readonly register: (
+    ownerKind: ScriptOwnerKind,
+    ownerName: string,
+    scripts: ScriptContributions | ScriptContribution | RawHtml | string,
+  ) => void;
+  readonly entries: () => readonly RegisteredScript[];
 };
 
 export function defineComponent<
@@ -474,6 +536,10 @@ export function defineComponent<
   NS extends NamingStrategy = NamingStrategy,
 >(
   name: string,
+  options: {
+    readonly stylesheets?: ComponentStylesheets;
+    readonly scripts?: ScriptContributionsDef<Ctx, NS>;
+  },
   fn: Component<Props, Ctx, NS>,
 ): Component<Props, Ctx, NS>;
 export function defineComponent<
@@ -482,11 +548,26 @@ export function defineComponent<
   NS extends NamingStrategy = NamingStrategy,
 >(
   name: string,
-  stylesheetsOrFn: ComponentStylesheets | Component<Props, Ctx, NS>,
+  fn: Component<Props, Ctx, NS>,
+): Component<Props, Ctx, NS>;
+export function defineComponent<
+  Props,
+  Ctx extends object = EmptyObject,
+  NS extends NamingStrategy = NamingStrategy,
+>(
+  name: string,
+  stylesheetsOrFn:
+    | ComponentStylesheets
+    | {
+      readonly stylesheets?: ComponentStylesheets;
+      readonly scripts?: ScriptContributionsDef<Ctx, NS>;
+    }
+    | Component<Props, Ctx, NS>,
   maybeFn?: Component<Props, Ctx, NS>,
 ): Component<Props, Ctx, NS> {
   const makeComponent = (
     stylesheets: ComponentStylesheets,
+    scripts: ScriptContributionsDef<Ctx, NS> | undefined,
     fn: Component<Props, Ctx, NS>,
   ): Component<Props, Ctx, NS> => {
     const definedStylesheets = stylesheets.length > 0 ? stylesheets : undefined;
@@ -500,6 +581,12 @@ export function defineComponent<
         if (definedStylesheets) {
           componentCtx.componentStyles.register(name, definedStylesheets);
         }
+        registerScriptContributions(
+          componentCtx,
+          "component",
+          name,
+          scripts,
+        );
         ctx.trace({
           kind: "component",
           elementId: ctx.naming.elemIdValue(name, "component"),
@@ -508,17 +595,43 @@ export function defineComponent<
         });
         return fn(componentCtx, props);
       },
-      definedStylesheets ? { stylesheets: definedStylesheets } : {},
+      definedStylesheets || scripts
+        ? {
+          ...(definedStylesheets ? { stylesheets: definedStylesheets } : {}),
+          ...(!scripts || typeof scripts === "function"
+            ? {}
+            : { scripts: normalizeScriptContributions(scripts) }),
+        }
+        : {},
     ) as Component<Props, Ctx, NS>;
     return component;
   };
 
   if (typeof stylesheetsOrFn === "function") {
-    return makeComponent([], stylesheetsOrFn);
+    return makeComponent([], undefined, stylesheetsOrFn);
   }
-  const fn = maybeFn;
-  if (!fn) throw new Error("fluent-ds: defineComponent missing renderer");
-  return makeComponent(stylesheetsOrFn, fn);
+
+  if (Array.isArray(stylesheetsOrFn)) {
+    const fn = maybeFn;
+    if (!fn) throw new Error("fluent-ds: defineComponent missing renderer");
+    return makeComponent(stylesheetsOrFn, undefined, fn);
+  }
+
+  if (stylesheetsOrFn && typeof stylesheetsOrFn === "object") {
+    const fn = maybeFn;
+    if (!fn) throw new Error("fluent-ds: defineComponent missing renderer");
+    const opts = stylesheetsOrFn as {
+      readonly stylesheets?: ComponentStylesheets;
+      readonly scripts?: ScriptContributionsDef<Ctx, NS>;
+    };
+    return makeComponent(
+      opts.stylesheets ?? [],
+      opts.scripts,
+      fn,
+    );
+  }
+
+  throw new Error("fluent-ds: defineComponent missing renderer");
 }
 
 /* -----------------------------------------------------------------------------
@@ -579,6 +692,7 @@ export type RenderOptionsFor<
 > = {
   readonly slots: SlotBuilders<L["slots"], Ctx, NS>;
   readonly styleAttributeEmitStrategy?: StyleAttributeEmitStrategy;
+  readonly scriptEmitStrategy?: ScriptEmitStrategy;
 };
 
 type HeadSlotsFor<
@@ -598,7 +712,8 @@ export type PageOptionsFor<
 > =
   & RenderOptionsFor<L, Ctx, NS>
   & HeadSlotsFor<L, Ctx, NS>
-  & { readonly styleAttributeEmitStrategy?: StyleAttributeEmitStrategy };
+  & { readonly styleAttributeEmitStrategy?: StyleAttributeEmitStrategy }
+  & { readonly scriptEmitStrategy?: ScriptEmitStrategy };
 
 export type DesignSystem<
   R extends RegionsRegistry<Ctx, NS>,
@@ -729,6 +844,7 @@ export function createDesignSystem<
             renderCtx,
             options.slots,
             options.styleAttributeEmitStrategy,
+            options.scriptEmitStrategy,
           ),
         renderPretty: (layoutName, renderCtx, options) =>
           renderInternal(
@@ -742,6 +858,7 @@ export function createDesignSystem<
             renderCtx,
             options.slots,
             options.styleAttributeEmitStrategy,
+            options.scriptEmitStrategy,
           ),
         page: (layoutName, renderCtx, options) =>
           renderPageInternal(
@@ -759,6 +876,7 @@ export function createDesignSystem<
               | Record<string, SlotBuilder<Ctx, NS>>
               | undefined,
             options.styleAttributeEmitStrategy,
+            options.scriptEmitStrategy,
           ),
       };
 
@@ -790,6 +908,7 @@ function renderInternal<Ctx extends object, NS extends NamingStrategy>(
   renderCtx: Ctx,
   layoutSlots: Record<string, SlotBuilder<Ctx, NS>>,
   styleAttributeEmitStrategy?: StyleAttributeEmitStrategy,
+  scriptEmitStrategy?: ScriptEmitStrategy,
 ): RawHtml {
   if (policy.rawPolicy) h.setRawPolicy(policy.rawPolicy);
 
@@ -807,6 +926,7 @@ function renderInternal<Ctx extends object, NS extends NamingStrategy>(
     cls: makeClassNames(naming, "layout"),
     css: h.styleText,
     componentStyles: createComponentStyleRegistry(naming),
+    scripts: createScriptRegistry(),
     trace,
     policy,
   };
@@ -839,11 +959,19 @@ function renderInternal<Ctx extends object, NS extends NamingStrategy>(
     layoutSlots,
   );
 
-  return emitStyleAttributeCss(
+  const styled = emitStyleAttributeCss(
     raw,
     styleAttributeEmitStrategy,
     ctxBase.componentStyles.cssText(),
   );
+  const { inlineScripts } = planScriptEmissions(
+    dsName,
+    ctxBase.scripts.entries(),
+    scriptEmitStrategy,
+  );
+  return inlineScripts.length > 0
+    ? combineHast(styled, ...inlineScripts)
+    : styled;
 }
 
 function renderPageInternal<Ctx extends object, NS extends NamingStrategy>(
@@ -859,6 +987,7 @@ function renderPageInternal<Ctx extends object, NS extends NamingStrategy>(
   layoutSlots: Record<string, SlotBuilder<Ctx, NS>>,
   headSlotsIn: Record<string, SlotBuilder<Ctx, NS>> | undefined,
   styleAttributeEmitStrategy?: StyleAttributeEmitStrategy,
+  scriptEmitStrategy?: ScriptEmitStrategy,
 ): RawHtml {
   if (policy.rawPolicy) h.setRawPolicy(policy.rawPolicy);
 
@@ -876,6 +1005,7 @@ function renderPageInternal<Ctx extends object, NS extends NamingStrategy>(
     cls: makeClassNames(naming, "layout"),
     css: h.styleText,
     componentStyles: createComponentStyleRegistry(naming),
+    scripts: createScriptRegistry(),
     trace,
     policy,
   };
@@ -935,24 +1065,36 @@ function renderPageInternal<Ctx extends object, NS extends NamingStrategy>(
     ["body"],
     ctxBase.componentStyles.cssText(),
   );
+  const scriptPlan = planScriptEmissions(
+    dsName,
+    ctxBase.scripts.entries(),
+    scriptEmitStrategy,
+  );
   if (cssText && styleAttributeEmitStrategy === "head") {
     headChildren.unshift(h.style(cssText));
-    headChildren.unshift(browserUserAgentHeadTags(baseDeps));
-  } else {
-    const uaDeps = cssText && styleAttributeEmitStrategy === "ua-dep"
-      ? [
-        ...baseDeps,
-        h.uaDepCssContent(styleAttributeCssMountPoint(dsName), cssText, {
-          emit: "link",
-        }),
-      ]
-      : baseDeps;
+  }
+  if (scriptPlan.headScripts.length > 0) {
+    headChildren.push(...scriptPlan.headScripts);
+  }
+
+  const cssDeps = cssText && styleAttributeEmitStrategy === "ua-dep"
+    ? [
+      h.uaDepCssContent(styleAttributeCssMountPoint(dsName), cssText, {
+        emit: "link",
+      }),
+    ]
+    : [];
+  const uaDeps = [...baseDeps, ...cssDeps, ...scriptPlan.uaDeps];
+  if (uaDeps.length > 0) {
     headChildren.unshift(browserUserAgentHeadTags(uaDeps));
   }
 
+  const bodyWithScripts = scriptPlan.bodyScripts.length > 0
+    ? combineHast(body, ...scriptPlan.bodyScripts)
+    : body;
   const page = h.html(
     h.head(...headChildren),
-    h.body(body),
+    h.body(bodyWithScripts),
   );
   const doc = h.doctype();
 
@@ -998,6 +1140,201 @@ function createComponentStyleRegistry(
   };
 }
 
+function normalizeScriptContributions(
+  scripts:
+    | ScriptContributions
+    | ScriptContribution
+    | RawHtml
+    | string
+    | undefined,
+): ScriptContributions {
+  if (!scripts) return [];
+  if (Array.isArray(scripts)) return scripts;
+  if (typeof scripts === "string") return [{ code: scripts }];
+  if (typeof scripts === "object" && "__rawHtml" in scripts) {
+    return [{ code: scripts as RawHtml }];
+  }
+  return [scripts as ScriptContribution];
+}
+
+function resolveScriptContributions<
+  Ctx extends object,
+  NS extends NamingStrategy,
+>(
+  scripts:
+    | ScriptContributionsDef<Ctx, NS>
+    | ScriptContribution
+    | RawHtml
+    | string
+    | undefined,
+  ctx: RenderCtx<Ctx, NS>,
+): ScriptContributions {
+  if (!scripts) return [];
+  if (typeof scripts === "function") {
+    return normalizeScriptContributions(scripts(ctx));
+  }
+  return normalizeScriptContributions(scripts);
+}
+
+function registerScriptContributions<
+  Ctx extends object,
+  NS extends NamingStrategy,
+>(
+  ctx: RenderCtx<Ctx, NS>,
+  ownerKind: ScriptOwnerKind,
+  ownerName: string,
+  scripts:
+    | ScriptContributionsDef<Ctx, NS>
+    | ScriptContribution
+    | RawHtml
+    | string
+    | undefined,
+): void {
+  const resolved = resolveScriptContributions(scripts, ctx);
+  if (resolved.length === 0) return;
+  ctx.scripts.register(ownerKind, ownerName, resolved);
+}
+
+function createScriptRegistry(): ScriptRegistry {
+  const entries: RegisteredScript[] = [];
+  return {
+    register: (ownerKind, ownerName, scripts) => {
+      const normalized = normalizeScriptContributions(
+        scripts as
+          | ScriptContributions
+          | ScriptContribution
+          | RawHtml
+          | string,
+      );
+      if (normalized.length === 0) return;
+      for (const contribution of normalized) {
+        entries.push({ ownerKind, ownerName, contribution });
+      }
+    },
+    entries: () => entries,
+  };
+}
+
+function scriptAttributeMountPoint(
+  dsName: string,
+  kind: "script" | "module",
+): string {
+  const safe = dsName.replace(/[^a-zA-Z0-9_-]+/g, "-").replaceAll("--", "-");
+  return `/_ua/${safe}/inline.${kind}.js`;
+}
+
+function hashText(value: string): string {
+  let hash = 5381;
+  for (let i = 0; i < value.length; i++) {
+    hash = (hash * 33) ^ value.charCodeAt(i);
+  }
+  return (hash >>> 0).toString(16);
+}
+
+function scriptText(code: RawHtml | string): string {
+  return typeof code === "string" ? code : code.__rawHtml;
+}
+
+function scriptTag(contribution: ScriptContribution): RawHtml {
+  const hints = contribution.hints ?? {};
+  const attrs: h.Attrs = { ...(hints.attrs ?? {}) };
+  if (hints.as === "module") attrs.type = "module";
+  if (typeof contribution.code === "string") {
+    return h.scriptJs(contribution.code, attrs);
+  }
+  return h.script(attrs, contribution.code);
+}
+
+function scriptIdentityKey(
+  contribution: ScriptContribution,
+  decision: ScriptEmitDecision,
+): string | undefined {
+  const identity = decision.identity ?? contribution.hints?.identity;
+  if (!identity || identity.kind === "none") return undefined;
+  if (identity.kind === "name") return `name:${identity.value}`;
+  if (identity.kind === "hash") {
+    return `hash:${hashText(scriptText(contribution.code))}`;
+  }
+  return undefined;
+}
+
+function planScriptEmissions(
+  dsName: string,
+  entries: readonly RegisteredScript[],
+  strategy?: ScriptEmitStrategy,
+): {
+  readonly headScripts: RawHtml[];
+  readonly bodyScripts: RawHtml[];
+  readonly inlineScripts: RawHtml[];
+  readonly uaDeps: UaDependency[];
+} {
+  if (!strategy || strategy.mode === "skip") {
+    return { headScripts: [], bodyScripts: [], inlineScripts: [], uaDeps: [] };
+  }
+
+  const mode = strategy.mode ?? "hints";
+  const headScripts: RawHtml[] = [];
+  const bodyScripts: RawHtml[] = [];
+  const inlineScripts: RawHtml[] = [];
+  const uaDeps: UaDependency[] = [];
+  const seen = new Set<string>();
+
+  const uaDepTextByKind = new Map<"script" | "module", string[]>();
+
+  for (const entry of entries) {
+    const hints = entry.contribution.hints ?? {};
+    const baseDecision: ScriptEmitDecision = {
+      placement: hints.placement ?? strategy.placement ?? "body-end",
+      emit: hints.emit ?? "inline",
+      identity: hints.identity,
+    };
+    let modeDecision: ScriptEmitDecision;
+    if (mode === "inline") {
+      modeDecision = { ...baseDecision, emit: "inline" };
+    } else if (mode === "ua-dep") {
+      modeDecision = { ...baseDecision, emit: "ua-dep" };
+    } else {
+      modeDecision = baseDecision;
+    }
+    const decision = strategy.resolve
+      ? { ...modeDecision, ...strategy.resolve(entry) }
+      : modeDecision;
+    if (!decision.emit || decision.emit === "skip") continue;
+
+    const identityKey = scriptIdentityKey(entry.contribution, decision);
+    if (identityKey) {
+      if (seen.has(identityKey)) continue;
+      seen.add(identityKey);
+    }
+
+    if (decision.emit === "ua-dep") {
+      const as = hints.as ?? "script";
+      const list = uaDepTextByKind.get(as) ?? [];
+      list.push(scriptText(entry.contribution.code));
+      uaDepTextByKind.set(as, list);
+      continue;
+    }
+
+    const scriptNode = scriptTag(entry.contribution);
+    if (decision.placement === "head") headScripts.push(scriptNode);
+    else bodyScripts.push(scriptNode);
+    inlineScripts.push(scriptNode);
+  }
+
+  for (const [as, parts] of uaDepTextByKind.entries()) {
+    const content = parts.join("\n");
+    if (!content) continue;
+    uaDeps.push(
+      h.uaDepJsContent(scriptAttributeMountPoint(dsName, as), content, {
+        emit: "link",
+        as,
+      }),
+    );
+  }
+
+  return { headScripts, bodyScripts, inlineScripts, uaDeps };
+}
+
 function invokeLayout<Ctx extends object, NS extends NamingStrategy>(
   layouts: Record<string, LayoutDef<string, Any, Ctx, NS>>,
   ctx: RenderCtx<Ctx, NS>,
@@ -1022,6 +1359,8 @@ function invokeLayout<Ctx extends object, NS extends NamingStrategy>(
     className: ctx.naming.className(layoutName, "layout"),
     phase: "enter",
   });
+
+  registerScriptContributions(layoutCtx, "layout", layoutName, def.scripts);
 
   const slots = normalizeAndValidateSlots(
     layoutCtx,
@@ -1064,6 +1403,8 @@ function invokeRegion<Ctx extends object, NS extends NamingStrategy>(
     className: ctx.naming.className(regionName, "region"),
     phase: "enter",
   });
+
+  registerScriptContributions(regionCtx, "region", regionName, def.scripts);
 
   const slots = normalizeAndValidateSlots(
     regionCtx,
