@@ -1,6 +1,6 @@
-import { defineLayout, slots } from "../../natural-html/design-system.ts";
-import * as h from "../../natural-html/elements.ts";
-import { headSlotSpec } from "../../natural-html/patterns.ts";
+import { defineLayout, slots } from "../natural-html/design-system.ts";
+import * as h from "../natural-html/elements.ts";
+import { headSlotSpec } from "../natural-html/patterns.ts";
 
 export const naturalLayout = defineLayout({
   name: "NaturalDoc",

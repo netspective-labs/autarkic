@@ -13,7 +13,7 @@ import {
   headSlots,
   RenderInput,
 } from "../natural-html/patterns.ts";
-import { naturalLayout } from "./layout/mod.ts";
+import { naturalLayout } from "./layouts.ts";
 import {
   breadcrumbRowRegion,
   contextHeaderRegion,
