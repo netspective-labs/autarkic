@@ -12,6 +12,10 @@
  */
 
 import { z } from "@zod";
+import {
+  createSseDiagnostics,
+  type SseDiagnosticEntry,
+} from "../../../lib/continuux/http-ux/aide.ts";
 import { Application, htmlResponse } from "../../../lib/continuux/http.ts";
 import {
   createCx,
@@ -33,6 +37,7 @@ import {
 } from "../../../lib/natural-html/dialog.ts";
 import type { RawHtml } from "../../../lib/natural-html/elements.ts";
 import * as H from "../../../lib/natural-html/elements.ts";
+import { customElement } from "../../../lib/natural-html/elements.ts";
 
 type Vars = Record<string, never>;
 
@@ -41,14 +46,18 @@ const schemas = defineSchemas({
   submitForm: (payload: unknown) => decodeCxEnvelope(payload),
 });
 
-type ServerEvents = { readonly js: string; readonly message: string };
+type ServerEvents = {
+  readonly js: string;
+  readonly diag: SseDiagnosticEntry;
+  readonly connection: SseDiagnosticEntry;
+};
 
 const dialogName = "hello-dialog";
 const dialogId = `${dialogName}-dialog`;
 const formId = `${dialogId}-form`;
 const summaryId = `${formId}-summary`;
 const diagId = `${formId}-diagnostics`;
-const diagListId = `${diagId}-list`;
+const sseInspectorTag = customElement("sse-inspector");
 
 const pointingMood = ["optimistic", "curious", "reflective"] as const;
 const palette = ["ember", "emerald", "azure"] as const;
@@ -88,6 +97,7 @@ const appState: State = { submissions: [] };
 
 const cx = createCx<State, Vars, typeof schemas, ServerEvents>(schemas);
 const hub = cx.server.sseHub();
+const sseDiagnostics = createSseDiagnostics(hub, "diag", "connection");
 
 const fieldSchemas: Record<string, z.ZodTypeAny> = {
   name: nameSchema,
@@ -285,20 +295,13 @@ const setSubmissionMessageJs = (message: string, success: boolean): string => `
   }
 `;
 
-const setDiagMessageJs = (message: string): string => `
-  {
-    const list = document.getElementById(${JSON.stringify(diagListId)});
-    if (!list) return;
-    const item = document.createElement("li");
-    item.textContent = ${JSON.stringify(message)};
-    item.style.marginBottom = "0.25rem";
-    item.style.fontFamily = "monospace";
-    list.insertBefore(item, list.firstChild);
-    while (list.childElementCount > 6) {
-      list.removeChild(list.lastElementChild);
-    }
-  }
-`;
+const sendDiagEvent = (
+  sessionId: string | undefined,
+  entry: Partial<SseDiagnosticEntry>,
+) => {
+  if (!sessionId) return;
+  sseDiagnostics.diag(sessionId, entry);
+};
 
 const normalizeFieldValue = (
   fieldName: string,
@@ -421,10 +424,14 @@ const pageHtml = (): string => {
             H.p(
               "Watch how ContinuUX SSE updates carry validation and submission events.",
             ),
-            H.ul({ id: diagListId }, H.li("Waiting for SSE traffic...")),
+            sseInspectorTag(),
           ),
         ),
         boot,
+        H.script(
+          { type: "module" },
+          H.trustedRaw(sseDiagnostics.inspectorScript()),
+        ),
         H.script(
           { type: "module" },
           H.trustedRaw(`window.__page_ready = "ok";`),
@@ -441,7 +448,7 @@ const handlers: CxActionHandlers<
   ServerEvents,
   "action"
 > = {
-  validateField: ({ cx: env, emit }) => {
+  validateField: ({ cx: env, emit, sessionId }) => {
     const fieldName = env.element.name ?? "";
     if (!fieldName) return { ok: true };
     const schemaForField = fieldSchemas[fieldName];
@@ -452,24 +459,26 @@ const handlers: CxActionHandlers<
       ? "Looks good"
       : parsed.error.issues[0]?.message ?? "Please fix this field";
     emit.js(setValidationFeedbackJs(fieldName, message, parsed.success));
-    emit.js(
-      setDiagMessageJs(
-        `${fieldName} validation -> ${
-          parsed.success ? "ok" : "fail"
-        }: ${message}`,
-      ),
-    );
+    sendDiagEvent(sessionId, {
+      message: `${fieldName} validation -> ${
+        parsed.success ? "ok" : "fail"
+      }: ${message}`,
+      level: parsed.success ? "info" : "warn",
+      payload: { field: fieldName, valid: parsed.success },
+    });
     return { ok: true };
   },
-  submitForm: ({ cx: env, emit, state }) => {
+  submitForm: ({ cx: env, emit, state, sessionId }) => {
     const parsed = formSchema.safeParse(env.form ?? {});
     if (!parsed.success) {
       const issues = parsed.error.issues
         .map((issue) => `${String(issue.path[0] ?? "field")}: ${issue.message}`)
         .join("; ");
-      emit.js(
-        setDiagMessageJs(`submit validation failed: ${issues}`),
-      );
+      sendDiagEvent(sessionId, {
+        message: `submit validation failed: ${issues}`,
+        level: "error",
+        payload: { issues },
+      });
       for (const issue of parsed.error.issues) {
         if (typeof issue.path[0] === "string") {
           emit.js(setValidationFeedbackJs(issue.path[0], issue.message, false));
@@ -482,12 +491,17 @@ const handlers: CxActionHandlers<
     const successMessage =
       `Submitted ${parsed.data.name}. Total submissions: ${state.submissions.length}.`;
     emit.js(setSubmissionMessageJs(successMessage, true));
-    emit.js(setDiagMessageJs(successMessage));
+    sendDiagEvent(sessionId, {
+      message: successMessage,
+      level: "info",
+      payload: { submissions: state.submissions.length },
+    });
     return { ok: true };
   },
 };
 
 const app = Application.sharedState(appState);
+sseDiagnostics.mountInspectorStatic(app);
 
 app.get("/browser-ua-aide.js", () => cx.server.uaModuleResponse("no-store"));
 
@@ -504,10 +518,10 @@ app.get("/cx/sse", (c) =>
         true,
       ),
     );
-    await session.sendWhenReady(
-      "js",
-      setDiagMessageJs("SSE diagnostics channel established"),
-    );
+    sseDiagnostics.connection(sessionId, {
+      message: "SSE diagnostics channel established",
+      level: "info",
+    });
   }));
 
 app.post("/cx", async (c) => {
