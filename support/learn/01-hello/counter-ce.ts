@@ -186,7 +186,7 @@ app.get("/ce/sse", (c) =>
 
     void session.ready.then(() => {
       queueMicrotask(() => {
-        if ((session as unknown as Session).isClosed()) sessions.delete(sid);
+        if (session.isClosed()) sessions.delete(sid);
       });
     });
   }));
