@@ -1,0 +1,532 @@
+#!/usr/bin/env -S deno run -A --watch --unstable-bundle --node-modules-dir=auto
+/**
+ * ContinuUX “Hello Dialog” sample.
+ *
+ * Demonstrates:
+ * - Natural Dialog form composition with SSE-backed live validation.
+ * - ContinuUX CX helper wiring (actions + SSE hub + boot script).
+ * - Server-sent validation messages and submit summary updates displayed inline.
+ *
+ * Run:
+ *   deno run -A support/learn/04-dialog/hello.ts
+ */
+
+import { z } from "@zod";
+import { Application, htmlResponse } from "../../../lib/continuux/http.ts";
+import {
+  createCx,
+  type CxActionHandlers,
+  cxPostHandler,
+  cxSseRegister,
+  defineSchemas,
+} from "../../../lib/continuux/interaction-html.ts";
+import { decodeCxEnvelope } from "../../../lib/continuux/interaction.ts";
+import {
+  checkboxField,
+  createDialog,
+  type DialogFieldName,
+  type DialogFieldRenderCtx,
+  type DialogRenderOptions,
+  type DialogZodObject,
+  inputField,
+  selectField,
+} from "../../../lib/natural-html/dialog.ts";
+import type { RawHtml } from "../../../lib/natural-html/elements.ts";
+import * as H from "../../../lib/natural-html/elements.ts";
+
+type Vars = Record<string, never>;
+
+const schemas = defineSchemas({
+  validateField: (payload: unknown) => decodeCxEnvelope(payload),
+  submitForm: (payload: unknown) => decodeCxEnvelope(payload),
+});
+
+type ServerEvents = { readonly js: string; readonly message: string };
+
+const dialogName = "hello-dialog";
+const dialogId = `${dialogName}-dialog`;
+const formId = `${dialogId}-form`;
+const summaryId = `${formId}-summary`;
+const diagId = `${formId}-diagnostics`;
+const diagListId = `${diagId}-list`;
+
+const pointingMood = ["optimistic", "curious", "reflective"] as const;
+const palette = ["ember", "emerald", "azure"] as const;
+
+const nameSchema = z.string().min(2, "Enter at least two characters");
+const emailSchema = z.string().email("Provide a valid email address");
+const ageSchema = z.preprocess((value) => {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return value;
+    const numeric = Number(trimmed);
+    return Number.isFinite(numeric) ? numeric : value;
+  }
+  return value;
+}, z.number().int().min(13, "Age must be at least 13").max(120));
+const moodSchema = z.enum(pointingMood).optional();
+const colorSchema = z.enum(palette);
+const subscribeSchema = z.preprocess((value) => {
+  if (typeof value === "string") return value === "true";
+  if (typeof value === "boolean") return value;
+  return false;
+}, z.boolean());
+
+const formSchema = z.object({
+  name: nameSchema,
+  email: emailSchema,
+  age: ageSchema,
+  mood: moodSchema,
+  color: colorSchema,
+  subscribe: subscribeSchema,
+}) as DialogZodObject;
+
+type FormSubmission = z.infer<typeof formSchema>;
+type State = { submissions: FormSubmission[] };
+
+const appState: State = { submissions: [] };
+
+const cx = createCx<State, Vars, typeof schemas, ServerEvents>(schemas);
+const hub = cx.server.sseHub();
+
+const fieldSchemas: Record<string, z.ZodTypeAny> = {
+  name: nameSchema,
+  email: emailSchema,
+  age: ageSchema,
+  mood: moodSchema,
+  color: colorSchema,
+  subscribe: subscribeSchema,
+};
+
+const changeAttr = () => cx.html.change("validateField");
+
+const validationWrapper = (
+  fieldHtml: RawHtml,
+  ctx: DialogFieldRenderCtx<DialogZodObject, DialogFieldName<DialogZodObject>>,
+): RawHtml => {
+  const feedbackId = `${ctx.formId}-${ctx.fieldName}-feedback`;
+  return H.div(
+    { class: ctx.classes.field, "data-field": ctx.fieldName },
+    ctx.label
+      ? H.label(
+        { class: ctx.classes.fieldLabel, for: ctx.inputId },
+        ctx.label,
+      )
+      : null,
+    fieldHtml,
+    ctx.description
+      ? H.p({ class: ctx.classes.fieldDescription }, ctx.description)
+      : null,
+    H.p(
+      {
+        id: feedbackId,
+        class: ctx.classes.fieldDescription,
+        "data-valid": "pending",
+      },
+      "",
+    ),
+    ctx.hasError
+      ? H.p(
+        { class: ctx.classes.fieldError, id: ctx.errorId },
+        ctx.errors[0]?.message ?? "Resolve this field",
+      )
+      : null,
+  );
+};
+
+const builder = createDialog(dialogName, formSchema);
+const fieldOrder = [
+  "name",
+  "email",
+  "age",
+  "mood",
+  "color",
+  "subscribe",
+] as const;
+
+builder.field("name", {
+  label: "Full name",
+  description: "How should we address you in follow-ups?",
+  renderer: inputField({
+    placeholder: "Ada Lovelace",
+    attrs: changeAttr(),
+  }),
+  wrapper: validationWrapper,
+});
+
+builder.field("email", {
+  label: "Email",
+  description: "We will never spam your inbox.",
+  renderer: inputField({
+    type: "email",
+    placeholder: "you@example.com",
+    attrs: changeAttr(),
+  }),
+  wrapper: validationWrapper,
+});
+
+builder.field("age", {
+  label: "Age",
+  description: "Used for contextualizing recommendations.",
+  renderer: inputField({
+    type: "number",
+    placeholder: "30",
+    attrs: changeAttr(),
+  }),
+  wrapper: validationWrapper,
+});
+
+builder.field("mood", {
+  label: "Current mood",
+  renderer: selectField({
+    options: pointingMood.map((value) => ({
+      value,
+      label: value[0].toUpperCase() + value.slice(1),
+    })),
+    includeBlank: "Pick a mood",
+    blankValue: "",
+    attrs: changeAttr(),
+  }),
+  wrapper: validationWrapper,
+});
+
+builder.field("color", {
+  label: "Favorite hue",
+  renderer: selectField({
+    options: palette.map((value) => ({
+      value,
+      label: value[0].toUpperCase() + value.slice(1),
+    })),
+    includeBlank: "Pick a color",
+    blankValue: "",
+    attrs: changeAttr(),
+  }),
+  wrapper: validationWrapper,
+});
+
+builder.field("subscribe", {
+  label: "Subscribe to updates",
+  renderer: checkboxField({
+    value: "true",
+    attrs: changeAttr(),
+  }),
+  wrapper: validationWrapper,
+});
+
+const dialog = builder.build();
+
+const initialData: Partial<z.infer<typeof formSchema>> = {
+  name: "Ada",
+  email: "ada@continuux.dev",
+  age: 29,
+  mood: "curious",
+  color: "emerald",
+  subscribe: true,
+};
+
+const orderedFieldOrder = fieldOrder as unknown as readonly DialogFieldName<
+  typeof formSchema
+>[];
+
+const renderDefaults: DialogRenderOptions<typeof formSchema> = {
+  dialogId,
+  formId,
+  fieldOrder: orderedFieldOrder,
+  headerTitle: "Live Validation Dialog",
+  headerDescription:
+    "Type into each field and watch how SSE streams validation feedback.",
+  fieldNamePrefix: "",
+  data: initialData,
+  formAttrs: cx.html.submit("submitForm"),
+};
+
+const feedbackElementId = (field: string) => `${formId}-${field}-feedback`;
+const inputElementId = (field: string) => `${formId}-${field}`;
+
+const setValidationFeedbackJs = (
+  field: string,
+  message: string,
+  valid: boolean,
+): string => `
+  {
+    const fb = document.getElementById(${
+  JSON.stringify(
+    feedbackElementId(field),
+  )
+});
+    if (fb) {
+      fb.textContent = ${JSON.stringify(message)};
+      fb.dataset.valid = ${JSON.stringify(valid ? "true" : "false")};
+    }
+    const inputEl = document.getElementById(${
+  JSON.stringify(
+    inputElementId(field),
+  )
+});
+    if (inputEl && "classList" in inputEl) {
+      if (${valid}) {
+        inputEl.classList.remove("natural-dialog__field-input--invalid");
+        inputEl.removeAttribute("aria-invalid");
+      } else {
+        inputEl.classList.add("natural-dialog__field-input--invalid");
+        inputEl.setAttribute("aria-invalid", "true");
+      }
+    }
+  }
+`;
+
+const setSubmissionMessageJs = (message: string, success: boolean): string => `
+  {
+    const target = document.getElementById(${JSON.stringify(summaryId)});
+    if (target) {
+      target.textContent = ${JSON.stringify(message)};
+      target.dataset.status = ${JSON.stringify(success ? "success" : "error")};
+    }
+  }
+`;
+
+const setDiagMessageJs = (message: string): string => `
+  {
+    const list = document.getElementById(${JSON.stringify(diagListId)});
+    if (!list) return;
+    const item = document.createElement("li");
+    item.textContent = ${JSON.stringify(message)};
+    item.style.marginBottom = "0.25rem";
+    item.style.fontFamily = "monospace";
+    list.insertBefore(item, list.firstChild);
+    while (list.childElementCount > 6) {
+      list.removeChild(list.lastElementChild);
+    }
+  }
+`;
+
+const normalizeFieldValue = (
+  fieldName: string,
+  input?: Partial<{ value?: string; checked?: boolean }>,
+): unknown => {
+  switch (fieldName) {
+    case "age": {
+      const raw = input?.value ?? "";
+      if (!raw.trim()) return raw;
+      const numeric = Number(raw);
+      return Number.isFinite(numeric) ? numeric : raw;
+    }
+    case "subscribe":
+      return !!input?.checked;
+    default:
+      return input?.value ?? "";
+  }
+};
+
+const dialogMarkup = dialog.render(renderDefaults);
+const dialogHtmlText = H.render(dialogMarkup);
+const inlineDialogMarkup = H.trustedRaw(
+  dialogHtmlText
+    .replace(/<dialog\b/, "<div")
+    .replace(/<\/dialog>/, "</div>"),
+);
+
+const pageHtml = (): string => {
+  const boot = cx.html.bootModuleScriptTag({
+    attrs: { id: "cxBoot" },
+    diagnostics: false,
+    debug: false,
+    autoConnect: true,
+  });
+
+  return H.render(
+    H.doctype(),
+    H.html(
+      H.head(
+        H.meta({ charset: "utf-8" }),
+        H.meta({
+          name: "viewport",
+          content: "width=device-width, initial-scale=1",
+        }),
+        H.title("ContinuUX Hello Dialog"),
+        H.link({
+          rel: "stylesheet",
+          href: "https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css",
+        }),
+        H.style(
+          `
+:root {
+  font-size: 85%;
+}
+  
+.dialog-summary {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.95rem;
+}
+.dialog-summary[data-status="success"] {
+  border: 1px solid #1a7f37;
+  background-color: #ecfdf3;
+  color: #0f5132;
+}
+.dialog-summary[data-status="error"] {
+  border: 1px solid #b91c1c;
+  background-color: #fee2e2;
+  color: #861b1b;
+}
+.dialog-summary[data-status="pending"] {
+  border: 1px solid #5f5f5f;
+  background-color: #f8fafc;
+  color: #475569;
+}
+.dialog-diagnostics {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid #cbd5f5;
+  background-color: #f9fafc;
+}
+.dialog-diagnostics h3 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  font-size: 1rem;
+}
+.dialog-diagnostics ul {
+  margin: 0;
+  padding-left: 1rem;
+}
+`,
+        ),
+      ),
+      H.body(
+        { class: "container", style: "max-width:720px; padding-top:2rem;" },
+        H.header(
+          H.h1("Hello Dialog"),
+          H.p(
+            "A moderately complex Natural Dialog form that validates live via SSE.",
+          ),
+        ),
+        H.main(
+          H.section(
+            { style: "margin-bottom:1rem;" },
+            H.h2("Live validation"),
+            H.p(
+              "Move through each field (change event fires on blur) and watch the ",
+              "server stream inline feedback before you even submit.",
+            ),
+          ),
+          inlineDialogMarkup,
+          H.section(
+            {
+              class: "dialog-summary",
+              id: summaryId,
+              "data-status": "pending",
+              style: "margin-top:1rem;",
+            },
+            "Connected to SSE. Start changing values to validate.",
+          ),
+          H.section(
+            { class: "dialog-diagnostics", id: diagId },
+            H.h3("SSE diagnostics"),
+            H.p(
+              "Watch how ContinuUX SSE updates carry validation and submission events.",
+            ),
+            H.ul({ id: diagListId }, H.li("Waiting for SSE traffic...")),
+          ),
+        ),
+        boot,
+        H.script(
+          { type: "module" },
+          H.trustedRaw(`window.__page_ready = "ok";`),
+        ),
+      ),
+    ),
+  );
+};
+
+const handlers: CxActionHandlers<
+  State,
+  Vars,
+  typeof schemas,
+  ServerEvents,
+  "action"
+> = {
+  validateField: ({ cx: env, emit }) => {
+    const fieldName = env.element.name ?? "";
+    if (!fieldName) return { ok: true };
+    const schemaForField = fieldSchemas[fieldName];
+    if (!schemaForField) return { ok: true };
+    const normalized = normalizeFieldValue(fieldName, env.input);
+    const parsed = schemaForField.safeParse(normalized);
+    const message = parsed.success
+      ? "Looks good"
+      : parsed.error.issues[0]?.message ?? "Please fix this field";
+    emit.js(setValidationFeedbackJs(fieldName, message, parsed.success));
+    emit.js(
+      setDiagMessageJs(
+        `${fieldName} validation -> ${
+          parsed.success ? "ok" : "fail"
+        }: ${message}`,
+      ),
+    );
+    return { ok: true };
+  },
+  submitForm: ({ cx: env, emit, state }) => {
+    const parsed = formSchema.safeParse(env.form ?? {});
+    if (!parsed.success) {
+      const issues = parsed.error.issues
+        .map((issue) => `${String(issue.path[0] ?? "field")}: ${issue.message}`)
+        .join("; ");
+      emit.js(
+        setDiagMessageJs(`submit validation failed: ${issues}`),
+      );
+      for (const issue of parsed.error.issues) {
+        if (typeof issue.path[0] === "string") {
+          emit.js(setValidationFeedbackJs(issue.path[0], issue.message, false));
+        }
+      }
+      emit.js(setSubmissionMessageJs(`Validation errors: ${issues}`, false));
+      return { ok: false, status: 400, message: "validation" };
+    }
+    state.submissions.push(parsed.data);
+    const successMessage =
+      `Submitted ${parsed.data.name}. Total submissions: ${state.submissions.length}.`;
+    emit.js(setSubmissionMessageJs(successMessage, true));
+    emit.js(setDiagMessageJs(successMessage));
+    return { ok: true };
+  },
+};
+
+const app = Application.sharedState(appState);
+
+app.get("/browser-ua-aide.js", () => cx.server.uaModuleResponse("no-store"));
+
+app.get("/", () => htmlResponse(pageHtml()));
+
+app.get("/cx/sse", (c) =>
+  c.sse<ServerEvents>(async (session) => {
+    const sessionId = c.query("sessionId") ?? "unknown";
+    cxSseRegister(hub, sessionId, session);
+    await session.sendWhenReady(
+      "js",
+      setSubmissionMessageJs(
+        "Connected. Form values stream validation as you move between fields.",
+        true,
+      ),
+    );
+    await session.sendWhenReady(
+      "js",
+      setDiagMessageJs("SSE diagnostics channel established"),
+    );
+  }));
+
+app.post("/cx", async (c) => {
+  const body = await c.readJson();
+  const result = await cxPostHandler(cx, {
+    req: c.req,
+    body,
+    state: appState,
+    vars: c.vars,
+    sse: hub,
+    handlers,
+  });
+  return cx.server.toResponse(result);
+});
+
+app.serve({ port: 7744 });
