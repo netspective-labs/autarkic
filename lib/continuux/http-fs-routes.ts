@@ -459,7 +459,8 @@ export function httpFsRoutes<State, Vars extends VarsRecord>(
     const headers = new Headers();
 
     // Content-Type from extension, if known.
-    const ct = contentType(match.filename) ?? undefined;
+    const ct = contentType(match.filename) ?? fallbackMimeFromExt(match.ext) ??
+      undefined;
     if (ct) headers.set("content-type", ct);
 
     // Cache-Control, if configured.
@@ -609,6 +610,22 @@ const extAllowed = (ext: string, m: FsContentMount): boolean => {
     return m.allowExts.some((x) => normalizeExt(x) === e);
   }
   return true;
+};
+
+const fallbackMimeFromExt = (ext: string): string | null => {
+  const normalized = ext.toLowerCase();
+  switch (normalized) {
+    case ".js":
+    case ".mjs":
+    case ".cjs":
+      return "application/javascript";
+    case ".ts":
+      return "application/typescript";
+    case ".css":
+      return "text/css";
+    default:
+      return null;
+  }
 };
 
 export function httpFsContent<State, Vars extends VarsRecord>(
@@ -772,7 +789,9 @@ export function httpFsContent<State, Vars extends VarsRecord>(
 
     const headers = new Headers();
 
-    const ct = contentType(chosen.filename) ?? undefined;
+    const ct = contentType(chosen.filename) ??
+      fallbackMimeFromExt(chosen.ext) ??
+      undefined;
     if (ct) headers.set("content-type", ct);
 
     if (opts.cacheControl) headers.set("cache-control", opts.cacheControl);
