@@ -241,6 +241,7 @@ export interface DialogRenderOptions<Schema extends DialogZodObject> {
   readonly method?: string;
   readonly data?: Partial<z.infer<Schema>>;
   readonly errors?: readonly DialogZodIssue[];
+  readonly mode?: DialogRenderMode;
   readonly fieldOrder?: readonly DialogFieldName<Schema>[];
   readonly headerTitle?: Child;
   readonly headerDescription?: Child;
@@ -292,6 +293,7 @@ export interface DialogBuilder<Schema extends DialogZodObject> {
       }
     >,
   ): DialogBuilder<Schema>;
+  mode(mode: DialogRenderMode): DialogBuilder<Schema>;
   style(cssText: string, attrs?: Attrs): DialogBuilder<Schema>;
   rawStyle(style: RawHtml): DialogBuilder<Schema>;
   script(js: string, attrs?: Attrs): DialogBuilder<Schema>;
@@ -300,6 +302,8 @@ export interface DialogBuilder<Schema extends DialogZodObject> {
   classes(classes: DialogClassNames): DialogBuilder<Schema>;
   build(): Dialog<Schema>;
 }
+
+export type DialogRenderMode = "modal" | "inline";
 
 export interface DialogSelectOption {
   readonly value: string;
@@ -573,6 +577,7 @@ function createDialogImpl<Schema extends DialogZodObject>(
   scripts: RawHtml[],
   uaDeps: UaDependency[],
   classes: Required<DialogClassNames>,
+  mode: DialogRenderMode,
 ): Dialog<Schema> {
   const shape = captureShape(schema);
 
@@ -610,9 +615,15 @@ function createDialogImpl<Schema extends DialogZodObject>(
         ? `${dialogId}-description`
         : undefined;
 
+      const effectiveMode = opts.mode ?? mode;
+      const isModal = effectiveMode === "modal";
       const baseDialogAttrs = h.attrs(
-        { id: dialogId, class: effectiveClasses.root, role: "dialog" },
-        opts.open === false ? null : { open: true },
+        {
+          id: dialogId,
+          class: effectiveClasses.root,
+          role: isModal ? "dialog" : "region",
+        },
+        isModal && opts.open !== false ? { open: true } : null,
         titleId ? { "aria-labelledby": titleId } : null,
         descriptionId ? { "aria-describedby": descriptionId } : null,
       );
@@ -741,7 +752,8 @@ function createDialogImpl<Schema extends DialogZodObject>(
         ...fieldNodes,
       );
 
-      return h.dialog(
+      const wrapper = isModal ? h.dialog : h.div;
+      return wrapper(
         dialogAttrs,
         h.div(
           { class: effectiveClasses.surface },
@@ -778,6 +790,8 @@ export function createDialog<Schema extends DialogZodObject>(
       spec as DialogFieldSpec<Schema, DialogFieldName<Schema>>,
     );
   };
+
+  let renderMode: DialogRenderMode = "modal";
 
   const builder: DialogBuilder<Schema> = {
     field<Name extends DialogFieldName<Schema>>(
@@ -820,6 +834,10 @@ export function createDialog<Schema extends DialogZodObject>(
       Object.assign(classOverrides, values);
       return builder;
     },
+    mode(value: DialogRenderMode) {
+      renderMode = value;
+      return builder;
+    },
     build() {
       const builtClasses: Required<DialogClassNames> = {
         ...DEFAULT_CLASS_NAMES,
@@ -834,6 +852,7 @@ export function createDialog<Schema extends DialogZodObject>(
         [...scripts],
         [...uaDeps],
         builtClasses,
+        renderMode,
       );
     },
   };

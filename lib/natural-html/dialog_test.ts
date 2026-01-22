@@ -111,3 +111,58 @@ Deno.test("dialog renders form, body, and actions as expected", () => {
 </dialog>`,
   );
 });
+
+Deno.test("dialog inline mode renders inline wrapper", () => {
+  const schema = z.object({
+    name: z.string(),
+    subscribe: z.boolean().optional(),
+  });
+  const dialog = createDialog("signup", schema)
+    .mode("inline")
+    .field("name", {
+      label: "Full name",
+      renderer: inputField({ placeholder: "First and last" }),
+    })
+    .field("subscribe", {
+      label: "Subscribe",
+      description: "Get updates",
+      renderer: checkboxField({ value: "yes" }),
+    })
+    .build();
+
+  const html = h.renderPretty(
+    dialog.render({
+      headerTitle: "Join",
+      headerDescription: "Create an account",
+      autoFocusField: "name",
+      data: { name: "Sam", subscribe: true },
+      hiddenFields: { source: "newsletter" },
+      cancel: { label: "No thanks" },
+      submit: { label: "Sign up" },
+      fieldOrder: ["name", "subscribe"],
+    }),
+  ).trim();
+
+  assertEquals(
+    html,
+    `<div aria-describedby="signup-dialog-description" aria-labelledby="signup-dialog-title" class="natural-dialog" id="signup-dialog" role="region">
+  <div class="natural-dialog__surface">
+    <header class="natural-dialog__header">
+      <h2 class="natural-dialog__title" id="signup-dialog-title">Join</h2>
+      <p class="natural-dialog__description" id="signup-dialog-description">Create an account</p>
+    </header>
+    <form action="" class="natural-dialog__form" id="signup-dialog-form" method="dialog"><input name="source" type="hidden" value="newsletter">
+      <div class="natural-dialog__body">
+        <div class="natural-dialog__field" data-field="name"><label class="natural-dialog__label" for="signup-dialog-form-name">Full name</label><input autofocus class="natural-dialog__control" id="signup-dialog-form-name" name="name" placeholder="First and last" type="text" value="Sam"></div>
+        <div class="natural-dialog__field" data-field="subscribe"><label class="natural-dialog__label" for="signup-dialog-form-subscribe">Subscribe</label><input checked class="natural-dialog__control" id="signup-dialog-form-subscribe" name="subscribe" type="checkbox" value="yes">
+          <p class="natural-dialog__field-description">Get updates</p>
+        </div>
+      </div>
+      <div class="natural-dialog__footer">
+        <div class="natural-dialog__actions"><button class="natural-dialog__action natural-dialog__action--secondary" type="button">No thanks</button><button class="natural-dialog__action natural-dialog__action--primary" type="submit">Sign up</button></div>
+      </div>
+    </form>
+  </div>
+</div>`,
+  );
+});
