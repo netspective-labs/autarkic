@@ -213,7 +213,7 @@ builder.field("subscribe", {
   wrapper: validationWrapper,
 });
 
-const dialog = builder.build();
+const dialog = builder.mode("inline").build();
 
 const initialData: Partial<z.infer<typeof formSchema>> = {
   name: "Ada",
@@ -319,12 +319,6 @@ const normalizeFieldValue = (
 };
 
 const dialogMarkup = dialog.render(renderDefaults);
-const dialogHtmlText = H.render(dialogMarkup);
-const inlineDialogMarkup = H.trustedRaw(
-  dialogHtmlText
-    .replace(/<dialog\b/, "<div")
-    .replace(/<\/dialog>/, "</div>"),
-);
 
 const pageHtml = (): string => {
   const boot = cx.html.bootModuleScriptTag({
@@ -411,7 +405,7 @@ const pageHtml = (): string => {
               "server stream inline feedback before you even submit.",
             ),
           ),
-          inlineDialogMarkup,
+          dialogMarkup,
           H.section(
             {
               class: "dialog-summary",

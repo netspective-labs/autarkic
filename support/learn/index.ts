@@ -34,6 +34,14 @@ const resources = [
     port: 8000,
   },
   {
+    id: "dialog-live",
+    name: "Hello Dialog",
+    description: "interactive forms validation using SSE",
+    path: "support/learn/04-dialog/hello.ts",
+    entry: "./04-dialog/hello.ts",
+    port: 7744,
+  },
+  {
     id: "markdown",
     name: "Hello Markdown",
     description: "client-side markdown preview app with custom HTML",
