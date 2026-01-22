@@ -254,89 +254,61 @@ const blankFrameHtml = `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Learning Resources</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"
+    />
     <style>
       :root {
-        color: #0f1115;
-        background: #f7f7fa;
-        font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+        font-size: 85%;
       }
       body {
-        margin: 0;
         min-height: 100vh;
-        background: radial-gradient(circle at top, #ffffff, #f0f1f6 60%);
-        color: #1c1f2a;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 2rem 1rem;
+        background: #f9fafb;
       }
       main {
-        padding: 2rem clamp(1rem, 4vw, 3.5rem);
-        max-width: 960px;
-        margin: 0 auto;
-        display: flex;
-        flex-direction: column;
-        gap: 1.5rem;
-      }
-      h1 {
-        margin: 0 0 0.5rem;
-        font-size: clamp(1.6rem, 3vw, 2.25rem);
-      }
-      h2 {
-        margin: 0;
-        font-size: 1.35rem;
-        letter-spacing: 0.01em;
-      }
-      .intro,
-      .instructions {
-        background: #fff;
-        border-radius: 18px;
-        padding: 1.5rem;
-        box-shadow: 0 10px 30px rgba(15, 17, 21, 0.08);
-        border: 1px solid #e0e3ec;
+        width: min(960px, 100%);
       }
       ol {
-        margin: 0;
-        padding: 0 0 0 1.2rem;
-        display: flex;
-        flex-direction: column;
-        gap: 1rem;
-        list-style: decimal;
+        margin-top: 0.75rem;
       }
       li {
-        background: #fff;
-        padding: 1rem 1.25rem;
-        border-radius: 12px;
-        border: 1px solid #d8dce8;
-        box-shadow: 0 8px 20px rgba(15, 17, 21, 0.05);
+        padding: 1rem;
+      }
+      .muted-text {
+        color: #6b7280;
       }
       .teaches {
-        margin: 0.35rem 0;
+        font-size: 0.95rem;
         font-style: italic;
-        color: #4a5060;
+        margin: 0.35rem 0;
       }
       .meta {
         margin: 0;
         font-size: 0.85rem;
-        color: #6b7284;
-      }
-      @media (max-width: 640px) {
-        ol {
-          padding-left: 0.9rem;
-        }
       }
     </style>
   </head>
   <body>
     <main>
-      <section class="intro">
-        <h1>Learning Resources Server</h1>
-        <p>
-          This page is the Junxion UX learning hub that catalogs ContinuUX,
-          Natural HTML, and Natural DS samples. Selecting a resource from the
-          dropdown above spins up its Deno command, proxies the port, and loads
-          the experience into this frame so you can see how each part of the
-          repo works together.
-        </p>
-        <p id="serverStatus">Waiting for selection…</p>
-      </section>
+      <article class="intro">
+        <header>
+          <h1>Learning Resources Server</h1>
+          <p>
+            The Junxion UX learning hub catalogs ContinuUX, Natural HTML, and
+            Natural DS samples. Selecting a resource spins up its Deno process,
+            proxies the port, and renders the experience in this frame so you can
+            inspect how each layer fits together.
+          </p>
+        </header>
+        <p id="serverStatus" class="muted-text">Waiting for selection…</p>
+      </article>
 
       <section>
         <h2>Available Learning Resources</h2>
@@ -344,12 +316,13 @@ const blankFrameHtml = `<!doctype html>
       </section>
 
       <section class="instructions">
+        <h3>How it works</h3>
         <p>
-          Each entry highlights a facet of the Junxion UX repo:
-          ContinuUX interaction schemata, Natural HTML markup helpers, Natural
-          DS layouts, or Continuux-backed helpers like \`autoTsJsBundler\`.
-          Choose one to “run” it—this frame will display the live page once
-          the Learning Resources Server finishes starting the example.
+          Each entry highlights a facet of the repo: ContinuUX interaction
+          schemata, Natural HTML helpers, Natural DS layouts, or Continuux-backed
+          tooling such as \`autoTsJsBundler\`. Select any resource to “run” it; once
+          the Learning Resources Server has started the example, this frame
+          loads the live view automatically.
         </p>
       </section>
     </main>
@@ -371,7 +344,7 @@ const blankFrameHtml = `<!doctype html>
         teaches.className = "teaches";
         const meta = document.createElement("p");
         meta.textContent = \`\${resource.path} · port \${resource.port}\`;
-        meta.className = "meta";
+        meta.className = "meta muted-text";
         li.append(title, desc, teaches, meta);
         list?.appendChild(li);
       }
