@@ -14,6 +14,13 @@ It is designed for scenarios where:
 OMB intentionally avoids frameworks and uses modern JavaScript, Custom Elements,
 and JSDoc typing for IDE support.
 
+OMB can be used in **two complementary ways**:
+
+1. As a **Web Component** (`ObjectModelBuilderElement`) that parses its own DOM
+   subtree or an external XML source.
+2. As a **pure factory-style builder** (`OmbBuilder`) with no custom elements,
+   suitable for scripts, loaders, inspectors, or headless-style usage.
+
 ## High-level concepts
 
 OMB builds a **tree of model nodes** from the DOM subtree of a custom element.
@@ -191,7 +198,48 @@ By default, OMB attempts to infer types from strings:
 
 This behavior is centralized and overridable.
 
-## `omb.js`
+## Factory-style usage (no Custom Elements)
+
+OMB can be used **without defining any custom elements**.
+
+This is useful for:
+
+- Static inspectors
+- Loaders
+- Tests
+- DSL tooling
+- Scripts
+- Sandboxes
+
+### Building directly from XML
+
+```js
+import { createOmbBuilder } from "./omb.js";
+
+const builder = createOmbBuilder();
+
+const model = await builder.buildFromXmlSrc("./fixtures/fixture-01.xml", {
+  host: document.documentElement,
+});
+
+const json = JSON.parse(
+  JSON.stringify(model.toJSON({ withTags: true })),
+);
+```
+
+### Building from an existing DOM element
+
+```js
+const rootEl = document.querySelector("#someContainer");
+
+const model = builder.buildFromDomRoot(rootEl, {
+  host: rootEl,
+});
+```
+
+No lifecycle, no custom element registration, no side effects.
+
+## Web Component usage
 
 ### Importing
 
@@ -205,13 +253,52 @@ import { ObjectModelBuilderElement } from "./omb.js";
 class MyElement extends ObjectModelBuilderElement {
   constructor() {
     super({
-      typedValue: (raw, tag) => raw === "yes" ? true : raw,
+      typedValue: (raw) => raw === "yes" ? true : raw,
     });
   }
 }
 
 customElements.define("my-element", MyElement);
 ```
+
+### Using with `omb:src`
+
+```html
+<my-element omb:src="./config.xml"></my-element>
+```
+
+The XML is fetched, parsed, and converted into a model automatically.
+
+## Typing features
+
+### Auto-typing (default)
+
+- yes / true / on / 1 → `true`
+- no / false / off / 0 → `false`
+- integers → `number`
+- floats / scientific notation → `number`
+- null / undefined → `null`
+- otherwise → `string`
+
+### Named typing with `omb:type`
+
+```xml
+<items omb:type="text-list-safe">
+  a, b, c
+</items>
+```
+
+- Raw string preserved at `.tag.rawValue`
+- Typed value stored at `.tag.value`
+- Parent getter returns typed value when used as child-attribute
+
+### Inline typing with `omb:type-as`
+
+```xml
+<count omb:type-as="Number(raw) * 2">21</count>
+```
+
+Evaluated at runtime. Use only with trusted markup.
 
 ### Options
 
