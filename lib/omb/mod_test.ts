@@ -10,8 +10,8 @@
 // - Compare structural JSON to GOLDEN.
 //
 // Golden workflow
-// - Golden lives in `GOLDEN` constant at the end of this file.
-// - To re-generate it, this creates it at ./mod_test.golden.json:
+// - For each fixture `./fixtures/*.omb.xml`, the golden is `./fixtures/*.omb.golden.json`.
+// - To re-generate, this writes per-fixture golden JSON:
 //     UPDATE_GOLDEN=1 deno test -A mod_test.ts
 // - In CI/CD, do NOT set UPDATE_GOLDEN; drift fails the test.
 //
@@ -106,22 +106,58 @@ async function readGolden(path: string): Promise<unknown | undefined> {
   }
 }
 
+async function listOmbFixtures(fixturesDir: string): Promise<string[]> {
+  const files: string[] = [];
+  for await (const e of Deno.readDir(fixturesDir)) {
+    if (!e.isFile) continue;
+    if (!e.name.endsWith(".omb.xml")) continue;
+    files.push(e.name);
+  }
+  files.sort((a, b) => a.localeCompare(b));
+  return files;
+}
+
 Deno.test(
-  "OMB golden regression: fixture model JSON deep-equals mod_test.golden.json",
-  async () => {
+  "OMB golden regression: all fixtures/*.omb.xml deep-equal matching *.omb.golden.json",
+  async (t) => {
     const here = dirname(fromFileUrl(import.meta.url));
+    const fixturesDir = join(here, "fixtures");
 
     const ombPath = join(here, "omb.js");
-    const fixturePath = join(here, "fixtures", "fixture-01.xml");
-    const goldenPath = join(here, "mod_test.golden.json");
+    const fixtureNames = await listOmbFixtures(fixturesDir);
 
-    const { origin, close } = startTestServer(
-      {
-        "/omb.js": ombPath,
-        "/fixtures/fixture-01.xml": fixturePath,
-      },
-      BLANK_HTML,
-    );
+    if (fixtureNames.length === 0) {
+      throw new Error(`No fixtures found in: ${fixturesDir}`);
+    }
+
+    // Map only the files we intend to serve (omb.js + each fixture xml + each golden json).
+    const ombJsBrowserPath = "/omb.js";
+    const allowPaths: Record<string, string> = {
+      [ombJsBrowserPath]: ombPath,
+    };
+
+    const cases = fixtureNames.map((xmlName) => {
+      const xmlFsPath = join(fixturesDir, xmlName);
+      const goldenName = xmlName.replace(/\.omb\.xml$/i, ".omb.golden.json");
+      const goldenFsPath = join(fixturesDir, goldenName);
+
+      const xmlUrlPath = `/fixtures/${xmlName}`;
+      const goldenUrlPath = `/fixtures/${goldenName}`;
+
+      allowPaths[xmlUrlPath] = xmlFsPath;
+      allowPaths[goldenUrlPath] = goldenFsPath;
+
+      return {
+        name: xmlName,
+        xmlName,
+        xmlFsPath,
+        xmlUrlPath,
+        goldenName,
+        goldenFsPath,
+      };
+    });
+
+    const { origin, close } = startTestServer(allowPaths, BLANK_HTML);
 
     const browser = await chromium.launch({ headless: true });
     const page = await browser.newPage();
@@ -139,54 +175,57 @@ Deno.test(
         ),
     );
 
+    const updateGolden = (Deno.env.get("UPDATE_GOLDEN") ?? "").trim() === "1";
+
     try {
       await page.goto(`${origin}/test.html`, { waitUntil: "domcontentloaded" });
 
-      const actual = await page.evaluate(async () => {
-        // deno-lint-ignore no-explicit-any
-        const doc = (globalThis as unknown as { document: any }).document;
-        if (!doc?.documentElement) {
-          throw new Error("no document in page context");
-        }
+      for (const c of cases) {
+        await t.step(c.name, async () => {
+          const actual = await page.evaluate(async (args) => {
+            // deno-lint-ignore no-explicit-any
+            const doc = (globalThis as unknown as { document: any }).document;
+            if (!doc?.documentElement) {
+              throw new Error("no document in page context");
+            }
 
-        // if you get "Unable to load a local module" error, ignore it
-        const mod = await import("/omb.js");
-        // deno-lint-ignore no-explicit-any
-        const { createOmbBuilder } = mod as any;
+            const mod = await import(args.ombJsBrowserPath);
+            // deno-lint-ignore no-explicit-any
+            const { createOmbBuilder } = mod as any;
 
-        const r = await fetch("/fixtures/fixture-01.xml", {
-          headers: { Accept: "application/xml,text/xml,*/*" },
+            const r = await fetch(args.xmlUrlPath, {
+              headers: { Accept: "application/xml,text/xml,*/*" },
+            });
+            if (!r.ok) {
+              throw new Error(
+                `fixture fetch failed (${r.status}): ${r.statusText}`,
+              );
+            }
+            const xml = await r.text();
+
+            const builder = createOmbBuilder();
+            const model = builder.buildFromXmlString(xml, {
+              host: doc.documentElement,
+            });
+
+            return JSON.parse(JSON.stringify(model.toJSON({ withTags: true })));
+          }, { xmlUrlPath: c.xmlUrlPath, ombJsBrowserPath });
+
+          if (updateGolden) {
+            await writeGolden(c.goldenFsPath, actual);
+            return;
+          }
+
+          const golden = await readGolden(c.goldenFsPath);
+          if (golden === undefined) {
+            throw new Error(
+              `Golden file missing or invalid for ${c.xmlName}: ${c.goldenName}. Re-run with UPDATE_GOLDEN=1 to generate it.`,
+            );
+          }
+
+          assertEquals(actual, golden);
         });
-        if (!r.ok) {
-          throw new Error(
-            `fixture fetch failed (${r.status}): ${r.statusText}`,
-          );
-        }
-        const xml = await r.text();
-
-        const builder = createOmbBuilder();
-        const model = builder.buildFromXmlString(xml, {
-          host: doc.documentElement,
-        });
-
-        return JSON.parse(JSON.stringify(model.toJSON({ withTags: true })));
-      });
-
-      const updateGolden = (Deno.env.get("UPDATE_GOLDEN") ?? "").trim() === "1";
-      if (updateGolden) {
-        await writeGolden(goldenPath, actual);
-        return;
       }
-
-      const golden = await readGolden(goldenPath);
-
-      if (golden === undefined) {
-        throw new Error(
-          "Golden file missing or invalid. Re-run with UPDATE_GOLDEN=1 to generate it.",
-        );
-      }
-
-      assertEquals(actual, golden);
     } finally {
       await page.close().catch(() => {});
       await browser.close().catch(() => {});
