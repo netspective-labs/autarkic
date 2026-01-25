@@ -559,5 +559,5 @@ console.log(
   `Learning Resources Server running on http://localhost:${indexPort}/`,
 );
 console.log(
-  `Project FS mounted at http://localhost:${indexPort}${projectFsMount}/ (rooted at ${projectFsRoot})`,
+  `Project FS mounted at http://localhost:${indexPort}${projectFsMount}/ (rooted at ${projectFsRootCanon})`,
 );
