@@ -12,11 +12,12 @@
   </head>
 
   <body>
-    <my-element id="ombRoot" omb:src="./fixtures/fixture-01.xml"></my-element>
+    <code>lib/natural-om/fixtures/synthetic-02.omb.xml</code>
+    <my-element id="ombRoot" omb:src="../../../lib/natural-om/fixtures/synthetic-02.omb.xml"></my-element>
     <json-viewer id="viewer"></json-viewer>
 
     <script type="module">
-      import { ObjectModelBuilderElement } from "./omb.js";
+      import { ObjectModelBuilderElement } from "../../../lib/natural-om/omb.js";
 
       class MyElement extends ObjectModelBuilderElement {}
       if (!customElements.get("my-element")) {

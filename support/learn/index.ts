@@ -6,15 +6,25 @@
  * servers on demand via Deno.Command.
  */
 
+import { serveDir, serveFile } from "@std/http/file-server";
+import { dirname, fromFileUrl, normalize, resolve } from "@std/path";
+
 type LearningResource = {
   id: string;
   name: string;
   description: string;
   path: string;
   entry: string;
-  port: number;
+  port: number; // if same as indexPort, does not start a new server, uses self
   teaches: string;
 };
+
+const indexPort = 7700;
+
+// Serve the full project filesystem (rooted at ../..) at /projectfs/*
+const projectFsMount = "/projectfs";
+const projectFsRoot = fromFileUrl(new URL("../..", import.meta.url));
+const projectFsRootCanon = projectFsRoot.replace(/[\/\\]+$/, "");
 
 const resources = [
   {
@@ -89,14 +99,25 @@ const resources = [
       "Natural DS context header, navigation, search, TOC, and markdown rendering powered by ContinuUX client bundling.",
   },
   {
-    id: "guide",
-    name: "Natural DS Guide",
+    id: "natural-ds-guide",
+    name: "Natural Design System Guide",
     description: "demo of full Natural Design System",
     path: "support/learn/03-natural-ds/guide.ts",
     entry: "./03-natural-ds/guide.ts",
     port: 7599,
     teaches:
       "Comprehensive Natural DS reference mirroring `lib/natural-ds`, showcasing accordions, cards, grids, nav components, and more.",
+  },
+  {
+    id: "natural-om-guide",
+    name: "Natural Object Model Guide",
+    description: "demo of Natural Object Model Builder (OMB)",
+    path: "support/learn/05-natural-om/index.ts",
+    // Served by this server via /projectfs
+    entry: "support/learn/05-natural-om/guide.html",
+    port: indexPort,
+    teaches:
+      "Comprehensive Natural OMB reference, showcasing how to easily transform XML to typed-ish JavaScript objects.",
   },
 ] satisfies LearningResource[];
 
@@ -106,7 +127,6 @@ const running = new Map<
   { resource: LearningResource; child: Deno.ChildProcess | null }
 >();
 
-const indexPort = 7700;
 const defaultRunArgs = [
   "run",
   "-A",
@@ -115,13 +135,16 @@ const defaultRunArgs = [
 ];
 
 const clientResources = resources.map(
-  ({ id, name, description, path, port, teaches }) => ({
+  ({ id, name, description, path, port, teaches, entry }) => ({
     id,
     name,
     description,
     path,
     port,
     teaches,
+    href: port === indexPort
+      ? `${projectFsMount}/${entry.replace(/^\.?\//, "")}`
+      : "/",
   }),
 );
 
@@ -170,10 +193,7 @@ const topFrameHtml = `<!doctype html>
         gap: 1rem;
         border-bottom: 1px solid #1f2530;
       }
-      label {
-        font-weight: 600;
-        letter-spacing: 0.01em;
-      }
+      label { font-weight: 600; letter-spacing: 0.01em; }
       select {
         appearance: none;
         padding: 0.5rem 2.5rem 0.5rem 0.7rem;
@@ -184,11 +204,7 @@ const topFrameHtml = `<!doctype html>
         font-size: 0.95rem;
         min-width: min(70vw, 520px);
       }
-      .status {
-        color: var(--muted);
-        font-size: 0.9rem;
-        white-space: nowrap;
-      }
+      .status { color: var(--muted); font-size: 0.9rem; white-space: nowrap; }
       @media (max-width: 720px) {
         header { flex-wrap: wrap; }
         select { min-width: 100%; }
@@ -216,9 +232,7 @@ const topFrameHtml = `<!doctype html>
         select.append(option);
       }
 
-      const setStatus = (text) => {
-        status.textContent = text;
-      };
+      const setStatus = (text) => { status.textContent = text; };
 
       const startResource = async (id) => {
         const res = byId.get(id);
@@ -232,7 +246,7 @@ const topFrameHtml = `<!doctype html>
           });
           if (!resp.ok) throw new Error(await resp.text());
           if (parent && parent.frames && parent.frames.resourceFrame) {
-            parent.frames.resourceFrame.location = \`http://localhost:\${res.port}/\`;
+            parent.frames.resourceFrame.location = \`http://localhost:\${res.port}\${res.href}\`;
           }
           setStatus(\`\${res.path} (port \${res.port})\`);
         } catch (err) {
@@ -256,14 +270,9 @@ const blankFrameHtml = `<!doctype html>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Learning Resources</title>
-    <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"
-    />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
     <style>
-      :root {
-        font-size: 85%;
-      }
+      :root { font-size: 85%; }
       body {
         min-height: 100vh;
         display: flex;
@@ -272,27 +281,13 @@ const blankFrameHtml = `<!doctype html>
         padding: 2rem 1rem;
         background: #f9fafb;
       }
-      main {
-        width: min(960px, 100%);
-      }
-      ol {
-        margin-top: 0.75rem;
-      }
-      li {
-        padding: 1rem;
-      }
-      .muted-text {
-        color: #6b7280;
-      }
-      .teaches {
-        font-size: 0.95rem;
-        font-style: italic;
-        margin: 0.35rem 0;
-      }
-      .meta {
-        margin: 0;
-        font-size: 0.85rem;
-      }
+      main { width: min(960px, 100%); }
+      ol { margin-top: 0.75rem; }
+      li { padding: 1rem; }
+      .muted-text { color: #6b7280; }
+      .teaches { font-size: 0.95rem; font-style: italic; margin: 0.35rem 0; }
+      .meta { margin: 0; font-size: 0.85rem; }
+      code { font-size: 0.92em; }
     </style>
   </head>
   <body>
@@ -301,38 +296,26 @@ const blankFrameHtml = `<!doctype html>
         <header>
           <h1>Learning Resources Server</h1>
           <p>
-            The Autarkic learning hub catalogs ContinuUX, Natural HTML, and
-            Natural DS samples. Selecting a resource spins up its Deno process,
-            proxies the port, and renders the experience in this frame so you can
-            inspect how each layer fits together.
+            The Autarkic learning hub catalogs ContinuUX, Natural HTML, and Natural DS samples.
+            Selecting a resource spins up its Deno process and renders it in this frame.
           </p>
         </header>
         <p id="serverStatus" class="muted-text">Waiting for selection…</p>
+        <p class="muted-text">
+          Project filesystem browser is mounted at <code>${projectFsMount}</code>
+          (rooted at <code>${projectFsRoot}</code>).
+        </p>
       </article>
-
       <section>
         <h2>Available Learning Resources</h2>
         <ol id="resourceList"></ol>
-      </section>
-
-      <section class="instructions">
-        <h3>How it works</h3>
-        <p>
-          Each entry highlights a facet of the repo: ContinuUX interaction
-          schemata, Natural HTML helpers, Natural DS layouts, or Continuux-backed
-          tooling such as \`autoTsJsBundler\`. Select any resource to “run” it; once
-          the Learning Resources Server has started the example, this frame
-          loads the live view automatically.
-        </p>
       </section>
     </main>
     <script type="module">
       const resources = ${JSON.stringify(clientResources)};
       const list = document.getElementById("resourceList");
       const status = document.getElementById("serverStatus");
-      if (status) {
-        status.textContent = "Learning Resources Server running on http://localhost:${indexPort}/";
-      }
+      if (status) status.textContent = "Learning Resources Server running on http://localhost:${indexPort}/";
       for (const resource of resources) {
         const li = document.createElement("li");
         const title = document.createElement("strong");
@@ -403,6 +386,11 @@ const waitForPort = async (port: number): Promise<boolean> => {
 const ensureStarted = async (resource: LearningResource) => {
   if (running.has(resource.id)) return;
 
+  if (resource.port === indexPort) {
+    running.set(resource.id, { resource, child: null });
+    return;
+  }
+
   if (await isPortReady(resource.port)) {
     running.set(resource.id, { resource, child: null });
     return;
@@ -410,7 +398,7 @@ const ensureStarted = async (resource: LearningResource) => {
 
   const entryUrl = new URL(resource.entry, import.meta.url);
   const command = new Deno.Command(Deno.execPath(), {
-    args: [...defaultRunArgs, entryUrl.pathname],
+    args: [...defaultRunArgs, fromFileUrl(entryUrl)],
     stdin: "null",
     stdout: "inherit",
     stderr: "inherit",
@@ -427,8 +415,123 @@ const ensureStarted = async (resource: LearningResource) => {
   await waitForPort(resource.port);
 };
 
+const htmlDiagnostics = (title: string, details: Record<string, unknown>) => {
+  const rows = Object.entries(details).map(([k, v]) => {
+    const text = typeof v === "string" ? v : JSON.stringify(v, null, 2);
+    const escaped = text.replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;");
+    return `<tr><th style="text-align:left;vertical-align:top;padding:6px 10px;border-bottom:1px solid #eee;">${k}</th><td style="white-space:pre-wrap;padding:6px 10px;border-bottom:1px solid #eee;">${escaped}</td></tr>`;
+  }).join("");
+  return new Response(
+    `<!doctype html><meta charset="utf-8" />
+     <title>${title}</title>
+     <body style="font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono','Courier New', monospace; padding:16px;">
+     <h2 style="margin:0 0 12px 0;">${title}</h2>
+     <table style="border-collapse:collapse; width:100%; max-width:1100px;">${rows}</table>
+     </body>`,
+    { status: 404, headers: { "content-type": "text/html; charset=utf-8" } },
+  );
+};
+
+const resolveProjectFsPath = (pathname: string) => {
+  const raw = pathname.startsWith(projectFsMount)
+    ? pathname.slice(projectFsMount.length)
+    : pathname;
+
+  const decoded = decodeURIComponent(raw);
+  const rel = decoded.replace(/^\/+/, "");
+  const fsPath = resolve(projectFsRootCanon, normalize(rel));
+
+  const withinRoot = fsPath === projectFsRootCanon ||
+    fsPath.startsWith(projectFsRootCanon + "/") ||
+    fsPath.startsWith(projectFsRootCanon + "\\");
+
+  return { raw, decoded, rel, fsPath, withinRoot };
+};
+
+const listDirSafe = async (path: string, limit = 200) => {
+  try {
+    const out: Array<
+      { name: string; kind: "file" | "dir" | "symlink" | "other" }
+    > = [];
+    let count = 0;
+    for await (const e of Deno.readDir(path)) {
+      out.push({
+        name: e.name,
+        kind: e.isFile
+          ? "file"
+          : e.isDirectory
+          ? "dir"
+          : e.isSymlink
+          ? "symlink"
+          : "other",
+      });
+      count += 1;
+      if (count >= limit) break;
+    }
+    return out;
+  } catch (err) {
+    return { error: String(err) };
+  }
+};
+
 Deno.serve({ port: indexPort }, async (req) => {
   const url = new URL(req.url);
+
+  if (url.pathname === projectFsMount) {
+    return new Response(null, {
+      status: 307,
+      headers: { location: `${projectFsMount}/` },
+    });
+  }
+
+  if (url.pathname.startsWith(`${projectFsMount}/`)) {
+    const resolved = resolveProjectFsPath(url.pathname);
+
+    if (!resolved.withinRoot) {
+      return htmlDiagnostics("Forbidden: request escaped project root", {
+        requestPath: url.pathname,
+        mount: projectFsMount,
+        fsRoot: projectFsRootCanon,
+        computedFsPath: resolved.fsPath,
+        rel: resolved.rel,
+      });
+    }
+
+    try {
+      const info = await Deno.stat(resolved.fsPath);
+      if (info.isFile) return serveFile(req, resolved.fsPath);
+
+      if (info.isDirectory) {
+        return serveDir(req, {
+          fsRoot: projectFsRootCanon,
+          urlRoot: projectFsMount,
+          showDirListing: true,
+        });
+      }
+
+      return htmlDiagnostics("Unsupported filesystem node", {
+        requestPath: url.pathname,
+        fsPath: resolved.fsPath,
+        stat: info,
+      });
+    } catch (err) {
+      const parent = dirname(resolved.fsPath);
+      const parentListing = await listDirSafe(parent);
+      return htmlDiagnostics("ProjectFS path not found", {
+        requestPath: url.pathname,
+        mount: projectFsMount,
+        fsRoot: projectFsRootCanon,
+        computedFsPath: resolved.fsPath,
+        rel: resolved.rel,
+        cwd: Deno.cwd(),
+        error: String(err),
+        parentDir: parent,
+        parentListing,
+      });
+    }
+  }
 
   if (url.pathname === "/") return serveIndex();
   if (url.pathname === "/frame-top") return serveTopFrame();
@@ -454,4 +557,7 @@ Deno.serve({ port: indexPort }, async (req) => {
 
 console.log(
   `Learning Resources Server running on http://localhost:${indexPort}/`,
+);
+console.log(
+  `Project FS mounted at http://localhost:${indexPort}${projectFsMount}/ (rooted at ${projectFsRoot})`,
 );

@@ -12,16 +12,17 @@
   </head>
 
   <body>
+    <code>lib/natural-om/fixtures/synthetic-01.omb.xml</code>
     <json-viewer id="viewer"></json-viewer>
 
     <script type="module">
-      import { createOmbBuilder } from "./omb.js";
+      import { createOmbBuilder } from "../../../lib/natural-om/omb.js";
 
       const viewer =
         /** @type {any} */ (document.querySelector("#viewer"));
 
       // Same fixture used by hello.html
-      const src = "./fixtures/fixture-01.xml";
+      const src = "../../../lib/natural-om/fixtures/synthetic-01.omb.xml";
 
       const builder = createOmbBuilder();
 

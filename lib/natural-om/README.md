@@ -1,9 +1,10 @@
-# Object Model Builder (OMB)
+# Natural Object Model Builder (OMB)
 
-**Object Model Builder (OMB)** is a browser-native, Web Components–based utility
-that transforms DOM markup into a structured, typed JavaScript object model.
+**Object Model Builder (OMB)** is a browser-native, Web Components–friendly
+utility that transforms DOM markup into a structured, typed-is "natural"
+JavaScript object model.
 
-It is designed for scenarios where:
+Natural Object Model's `OMB` is designed for scenarios where:
 
 - XML- or HTML-like markup is used as a declarative DSL
 - You want a clean separation between _physical syntax_ and _semantic data_
@@ -20,6 +21,10 @@ OMB can be used in **two complementary ways**:
    subtree or an external XML source.
 2. As a **pure factory-style builder** (`OmbBuilder`) with no custom elements,
    suitable for scripts, loaders, inspectors, or headless-style usage.
+
+💡 Start a local server (e.g. `serve-cwd-http`) and navigate to
+`support/learn/05-natural-om/guide.html` in the server to see an interactive
+guide which lets you read this `README.md` and see running examples.
 
 ## High-level concepts
 

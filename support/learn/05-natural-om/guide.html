@@ -13,7 +13,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Object Model Builder (OMB) Playground</title>
+    <title>Natural Object Model Builder (OMB) Playground</title>
 
     <script type="module">
       import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
@@ -279,7 +279,7 @@
 
   <body>
     <header>
-      <div class="title">Object Model Builder (OMB) Playground</div>
+      <div class="title">Natural Object Model Builder (OMB) Playground</div>
 
       <div style="display: flex; align-items: center; gap: 12px">
         <label
@@ -295,7 +295,7 @@
 
     <main>
       <div class="pane left">
-        <zero-md src="./README.md"></zero-md>
+        <zero-md src="../../../lib/natural-om/README.md"></zero-md>
       </div>
 
       <div class="pane right">
@@ -443,8 +443,8 @@
         createOmbBuilder,
         defaultTypedValue,
         ObjectModelBuilderElement,
-      } from "./omb.js";
-      import { toZodSchema } from "./omb-zod.js";
+      } from "../../../lib/natural-om/omb.js";
+      import { toZodSchema } from "../../../lib/natural-om/omb-zod.js";
 
       class MyElement extends ObjectModelBuilderElement {
         constructor() {
