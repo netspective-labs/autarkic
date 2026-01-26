@@ -1,5 +1,5 @@
 /**
- * @module lib/natural-html/design-system/starter.ts
+ * @module lib/natural-html/starter-ds.ts
  *
  * Minimal starter design system using PicoCSS via CDN.
  */

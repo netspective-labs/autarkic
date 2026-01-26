@@ -1,4 +1,4 @@
-// lib/natural-html/design-system/starter_test.ts
+// lib/natural-html/starter-ds_test.ts
 import { assertEquals } from "@std/assert";
 import * as h from "./elements.ts";
 import { headSlots } from "./patterns.ts";

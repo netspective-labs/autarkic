@@ -1,5 +1,5 @@
 /**
- * @module lib/natural-html/design-system/design-system.ts
+ * @module lib/natural-html/design-system.ts
  *
  * Natural DS derived from natural-ds.html reference.
  */
