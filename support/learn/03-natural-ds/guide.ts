@@ -63,6 +63,11 @@ import {
   type RenderInput,
 } from "../../../lib/natural-html/patterns.ts";
 
+import {
+  httpProxyFromManifest,
+  type ProxyManifestRoute,
+} from "../../../lib/continuux/http-proxy.ts";
+
 type State = Record<string, never>;
 type Vars = Record<string, never>;
 
@@ -140,6 +145,15 @@ const icons = {
   ),
 };
 
+const GITHUB_PROXY_HOST = "127.0.0.1";
+const GITHUB_PROXY_PORT = 7600;
+const GITHUB_PROXY_BASE_URL =
+  `http://${GITHUB_PROXY_HOST}:${GITHUB_PROXY_PORT}`;
+const GITHUB_PROXY_TOKEN = Deno.env.get("GITHUB_PROXY_TOKEN")?.trim();
+const githubProxyRequestHeaders = GITHUB_PROXY_TOKEN
+  ? { set: { Authorization: `token ${GITHUB_PROXY_TOKEN}` } }
+  : undefined;
+
 type ContextNavTarget = "docs" | "github";
 
 type DsRenderCtx = RenderCtx<RenderInput, NamingStrategy>;
@@ -198,6 +212,7 @@ type GitHubRepo = {
   readonly slug: string;
   readonly description: string;
   readonly url: string;
+  readonly path?: string;
 };
 
 type GitHubSubject = {
@@ -218,23 +233,10 @@ const gitHubSubjects: Record<GitHubSubjectId, GitHubSubject> = {
     icon: icons.docs,
     repos: [
       {
-        slug: "autarkic",
-        name: "Autarkic",
-        description:
-          "Deno UI shell combining Natural DS with ContinuUX patterns.",
-        url: "https://github.com/netspective/autarkic",
-      },
-      {
-        slug: "continuux",
-        name: "ContinuUX",
-        description: "Typed UI primitives and runtime for guided interfaces.",
-        url: "https://github.com/netspective/continuux",
-      },
-      {
-        slug: "natural-ds",
-        name: "Natural DS",
-        description: "The shared design system used throughout these docs.",
-        url: "https://github.com/netspective/natural-ds",
+        slug: "fluent",
+        name: "Fluent",
+        description: "Netspective Fluent M2M Platform",
+        url: "https://github.com/netspective/fluent",
       },
     ],
   },
@@ -247,10 +249,11 @@ const gitHubSubjects: Record<GitHubSubjectId, GitHubSubject> = {
     icon: icons.grid,
     repos: [
       {
-        slug: "home-polyglot",
-        name: "Home Polyglot",
-        description: "Prototype data portal for multilingual smart homes.",
-        url: "https://github.com/netspective-labs/home-polyglot",
+        slug: "autarkic",
+        name: "Autarkic",
+        description:
+          "Deno UI shell combining Natural DS with ContinuUX patterns.",
+        url: "https://github.com/netspective-labs/autarkic",
       },
       {
         slug: "sql-aide",
@@ -286,12 +289,6 @@ const gitHubSubjects: Record<GitHubSubjectId, GitHubSubject> = {
         description: "Decision support engine for value-based care teams.",
         url: "https://github.com/programmablemd/assurance-prime",
       },
-      {
-        slug: "sprybi",
-        name: "SpryBI",
-        description: "BI dashboards for ProgrammableMD care networks.",
-        url: "https://github.com/programmablemd/sprybi",
-      },
     ],
   },
 };
@@ -316,6 +313,30 @@ const getGitHubRepo = (
   slug?: string,
 ): GitHubRepo =>
   subject.repos.find((repo) => repo.slug === slug) ?? subject.repos[0];
+
+const githubProxyManifest: ProxyManifestRoute<State, Vars>[] = [
+  {
+    name: "github-root",
+    mount: "/",
+    upstream: "https://github.com",
+    stripMount: true,
+    forwardQuery: true,
+    responseHeaders: {
+      drop: [
+        "x-frame-options",
+        "content-security-policy",
+        "content-security-policy-report-only",
+      ],
+      set: {
+        "content-security-policy":
+          "frame-ancestors http://127.0.0.1:7599 http://127.0.0.1:7600 http://localhost:7599 http://localhost:7600;",
+      },
+    },
+    ...(githubProxyRequestHeaders
+      ? { requestHeaders: githubProxyRequestHeaders }
+      : {}),
+  },
+];
 
 const buildGitHubHeadSlots = (subject: GitHubSubject) =>
   headSlots({
@@ -1252,8 +1273,11 @@ const renderGitHubContent = (
   ctx: DsRenderCtx,
   subject: GitHubSubject,
   repo: GitHubRepo,
-) =>
-  H.div(
+) => {
+  const iframeSrc = `${GITHUB_PROXY_BASE_URL}${
+    repo.path ?? repo.url.slice("https://github.com".length)
+  }`;
+  return H.div(
     pageHeader(ctx, {
       title: "GitHub Explorer",
       description:
@@ -1285,7 +1309,7 @@ const renderGitHubContent = (
     }),
     bodyText(ctx, {
       content:
-        "Switch subjects or repositories from the sidebar to update the embedded preview.",
+        "Switch subjects or repositories from the sidebar to update the embedded preview. If you see a `404` or similar error, it might be a private repo.",
     }),
     H.section(
       {
@@ -1294,7 +1318,7 @@ const renderGitHubContent = (
           "margin-top: 24px; background:#ffffff; border-radius:12px; box-shadow:0 12px 40px rgba(15,23,42,0.15);",
       },
       H.iframe({
-        src: repo.url,
+        src: iframeSrc,
         title: `${repo.name} repository`,
         style:
           "width: 100%; min-height: 640px; border: 1px solid #e5e5e5; border-radius: 12px;",
@@ -1303,6 +1327,7 @@ const renderGitHubContent = (
       }),
     ),
   );
+};
 
 const gitHubPageHtml = (subject: GitHubSubject, repo: GitHubRepo): string => {
   const page = ds.page("NaturalDoc", {}, {
@@ -1327,6 +1352,32 @@ const respondGitHubPage = (
   const repo = getGitHubRepo(subject, repoSlug);
   return htmlResponse(gitHubPageHtml(subject, repo));
 };
+
+const githubProxyApp = Application.sharedState<State, Vars>({});
+
+githubProxyApp.use(
+  httpProxyFromManifest<State, Vars>(githubProxyManifest, {
+    requireHttpsUpstream: true,
+    allowedUpstreamHosts: (host) => host === "github.com",
+    onProxyError: (_c, kind, info) => {
+      console.error(
+        `[github-proxy] ${kind} ${info.routeName ?? ""} ${
+          info.upstreamUrl ?? ""
+        }`,
+        info.error,
+      );
+    },
+  }),
+);
+
+githubProxyApp.serve({
+  hostname: GITHUB_PROXY_HOST,
+  port: GITHUB_PROXY_PORT,
+  onListen: () =>
+    console.log(
+      `[github-proxy] serving GitHub through http://${GITHUB_PROXY_HOST}:${GITHUB_PROXY_PORT}/`,
+    ),
+});
 
 app.use(async (c, next) => {
   const u = new URL(c.req.url);
