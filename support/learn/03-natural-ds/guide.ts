@@ -47,10 +47,12 @@ import type {
   NamingStrategy,
   RenderCtx,
 } from "../../../lib/natural-html/design-system.ts";
-import * as H from "../../../lib/natural-html/elements.ts";
+import * as h from "../../../lib/natural-html/elements.ts";
 import {
   combineHast,
+  Content,
   headSlots,
+  renderContent,
   type RenderInput,
 } from "../../../lib/natural-html/patterns.ts";
 
@@ -174,6 +176,129 @@ const buildContextHeader = (ctx: DsRenderCtx, active: ContextNavTarget) =>
       chevron: icons.chevronDown,
     })
     .build();
+
+export type ApiPropDefinition = {
+  readonly name: string;
+  readonly type: string;
+  readonly defaultValue?: string;
+  readonly description?: Content<RenderInput, NamingStrategy>;
+  readonly required?: boolean;
+};
+
+export const apiPropRow = (
+  ctx: RenderCtx<RenderInput, NamingStrategy>,
+  def: ApiPropDefinition,
+): readonly (h.RawHtml | string)[] => [
+  combineHast(
+    ...[
+      h.span({ class: "prop-name" }, def.name),
+      ...(def.required ? [h.span({ class: "prop-required" }, "required")] : []),
+    ],
+  ),
+  h.span({ class: "prop-type" }, def.type),
+  h.span({ class: "prop-default" }, def.defaultValue ?? "—"),
+  renderContent(ctx, def.description) ?? "",
+];
+
+export type BadgeVariant = {
+  readonly label: string;
+  readonly variant?: string;
+};
+
+export const badgeRow = (
+  ctx: RenderCtx<RenderInput, NamingStrategy>,
+  variants: readonly BadgeVariant[],
+) =>
+  h.div(
+    { class: "badge-row" },
+    ...variants.map((variant) =>
+      badge(ctx, {
+        label: variant.label,
+        variant: variant.variant,
+      })
+    ),
+  );
+
+export type KeyboardShortcutExample = {
+  readonly label: string;
+  readonly keys: readonly string[];
+};
+
+export const keyboardShortcutList = (
+  ctx: RenderCtx<RenderInput, NamingStrategy>,
+  items: readonly KeyboardShortcutExample[],
+) =>
+  h.div(
+    { class: "keyboard-row" },
+    ...items.map((item) =>
+      h.div(
+        h.span({ class: "keyboard-label" }, item.label),
+        keyboardShortcut(ctx, { keys: item.keys }),
+      )
+    ),
+  );
+
+export type GitHubRepoPreviewProps = {
+  readonly icon?: Content<RenderInput, NamingStrategy>;
+  readonly subjectLabel: string;
+  readonly subjectOrg: string;
+  readonly subjectDescription: string;
+  readonly repoName: string;
+  readonly repoDescription: string;
+  readonly repoUrl: string;
+  readonly iframeSrc: string;
+  readonly helpText?: string;
+};
+
+export const githubRepoPreview = (
+  ctx: RenderCtx<RenderInput, NamingStrategy>,
+  props: GitHubRepoPreviewProps,
+) =>
+  h.div(
+    callout(ctx, {
+      title: `${props.subjectLabel} • ${props.subjectOrg}`,
+      icon: props.icon ?? icons.github,
+      variant: "info",
+      content: combineHast(
+        h.p(props.subjectDescription),
+        h.p(
+          h.span("Viewing: "),
+          h.strong(props.repoName),
+          " — ",
+          props.repoDescription,
+        ),
+        h.p(
+          h.a(
+            {
+              href: props.repoUrl,
+              target: "_blank",
+              rel: "noreferrer",
+            },
+            "Open on GitHub",
+          ),
+        ),
+      ),
+    }),
+    bodyText(ctx, {
+      content: props.helpText ??
+        "Switch subjects or repositories from the sidebar to update the embedded preview. If you see a `404` or similar error, it might be a private repo.",
+    }),
+    h.section(
+      {
+        class: "github-iframe",
+        style:
+          "margin-top: 24px; background:#ffffff; border-radius:12px; box-shadow:0 12px 40px rgba(15,23,42,0.15);",
+      },
+      h.iframe({
+        src: props.iframeSrc,
+        title: `${props.repoName} repository`,
+        style:
+          "width: 100%; min-height: 640px; border: 1px solid #e5e5e5; border-radius: 12px;",
+        loading: "lazy",
+        referrerpolicy: "no-referrer",
+      }),
+    ),
+  );
 
 type GitHubSubjectId =
   | "netspective"
@@ -338,8 +463,8 @@ const buildGitHubHeadSlots = (subject: GitHubSubject) =>
   headSlots({
     title: `GitHub Explorer — ${subject.title}`,
     meta: [
-      H.meta({ charset: "utf-8" }),
-      H.meta({
+      h.meta({ charset: "utf-8" }),
+      h.meta({
         name: "viewport",
         content: "width=device-width, initial-scale=1",
       }),
@@ -380,13 +505,13 @@ const pageHtml = (request: Request): string => {
           ])
           .build(),
       content: (ctx) =>
-        H.div(
+        h.div(
           pageHeader(ctx, {
             title: "Design System Reference",
             description:
               "A comprehensive guide to all available components, layout regions, and styling patterns in this design system. Use this page as your reference when building documentation sites.",
           }),
-          H.section(
+          h.section(
             { id: "layout" },
             sectionHeading(ctx, { title: "Layout Structure", href: "#layout" }),
             bodyText(ctx, {
@@ -397,14 +522,14 @@ const pageHtml = (request: Request): string => {
               title: "Layout Grid",
               icon: icons.info,
               variant: "info",
-              content: H.div(
-                H.strong("Left Sidebar:"),
+              content: h.div(
+                h.strong("Left Sidebar:"),
                 " 280px fixed width",
-                H.br(),
-                H.strong("Main Content:"),
+                h.br(),
+                h.strong("Main Content:"),
                 " Flexible (1fr)",
-                H.br(),
-                H.strong("Right TOC:"),
+                h.br(),
+                h.strong("Right TOC:"),
                 " 200px fixed width",
               ),
             }),
@@ -417,9 +542,9 @@ const pageHtml = (request: Request): string => {
               items: [
                 definitionItem(ctx, {
                   term: ".sidebar-header",
-                  description: H.span(
+                  description: h.span(
                     "Contains the logo/brand and theme toggle button. Uses flexbox with ",
-                    H.codeTag("justify-content: space-between"),
+                    h.codeTag("justify-content: space-between"),
                     ".",
                   ),
                 }),
@@ -435,20 +560,20 @@ const pageHtml = (request: Request): string => {
                 }),
                 definitionItem(ctx, {
                   term: ".nav-section",
-                  description: H.span(
+                  description: h.span(
                     "Grouped navigation with category headers (",
-                    H.codeTag(".nav-category"),
+                    h.codeTag(".nav-category"),
                     ") and links (",
-                    H.codeTag(".nav-link"),
+                    h.codeTag(".nav-link"),
                     "). Active link uses ",
-                    H.codeTag(".nav-link.active"),
+                    h.codeTag(".nav-link.active"),
                     ".",
                   ),
                 }),
               ],
             }),
           ),
-          H.section(
+          h.section(
             { id: "colors" },
             sectionHeading(ctx, { title: "Color Palette", href: "#colors" }),
             bodyText(ctx, {
@@ -474,7 +599,7 @@ const pageHtml = (request: Request): string => {
               ],
             }),
           ),
-          H.section(
+          h.section(
             { id: "typography" },
             sectionHeading(ctx, { title: "Typography", href: "#typography" }),
             bodyText(ctx, {
@@ -483,24 +608,24 @@ const pageHtml = (request: Request): string => {
             }),
             exampleWrapper(ctx, {
               label: "Type Scale",
-              content: H.div(
-                H.h1(
+              content: h.div(
+                h.h1(
                   { class: "type-scale-title" },
                   "Page Title (32px/700)",
                 ),
-                H.h2(
+                h.h2(
                   { class: "type-scale-section" },
                   "Section Heading (22px/600)",
                 ),
-                H.h3(
+                h.h3(
                   { class: "type-scale-subsection" },
                   "Subsection (18px/600)",
                 ),
-                H.p(
+                h.p(
                   { class: "type-scale-body" },
                   "Body text paragraph (15px/normal)",
                 ),
-                H.p(
+                h.p(
                   { class: "type-scale-small" },
                   "Small text for captions (13px)",
                 ),
@@ -508,16 +633,16 @@ const pageHtml = (request: Request): string => {
             }),
             subsectionHeading(ctx, { title: "Inline Code" }),
             bodyText(ctx, {
-              content: H.span(
+              content: h.span(
                 "Inline code uses the ",
-                H.codeTag("code"),
+                h.codeTag("code"),
                 " element with a rose/red color for visual distinction: ",
-                H.codeTag("font-family: monospace"),
+                h.codeTag("font-family: monospace"),
                 ".",
               ),
             }),
           ),
-          H.section(
+          h.section(
             { id: "spacing" },
             sectionHeading(ctx, { title: "Spacing", href: "#spacing" }),
             bodyText(ctx, {
@@ -528,53 +653,53 @@ const pageHtml = (request: Request): string => {
               head: ["Token", "Value", "Usage"],
               rows: [
                 [
-                  H.span({ class: "prop-name" }, "spacing-xs"),
-                  H.span({ class: "prop-default" }, "4px"),
+                  h.span({ class: "prop-name" }, "spacing-xs"),
+                  h.span({ class: "prop-default" }, "4px"),
                   "Gap between keyboard keys, minimal spacing",
                 ],
                 [
-                  H.span({ class: "prop-name" }, "spacing-sm"),
-                  H.span({ class: "prop-default" }, "8px"),
+                  h.span({ class: "prop-name" }, "spacing-sm"),
+                  h.span({ class: "prop-default" }, "8px"),
                   "Icon-text gaps, tight element spacing",
                 ],
                 [
-                  H.span({ class: "prop-name" }, "spacing-md"),
-                  H.span({ class: "prop-default" }, "16px"),
+                  h.span({ class: "prop-name" }, "spacing-md"),
+                  h.span({ class: "prop-default" }, "16px"),
                   "Default padding, sidebar gaps",
                 ],
                 [
-                  H.span({ class: "prop-name" }, "spacing-lg"),
-                  H.span({ class: "prop-default" }, "24px"),
+                  h.span({ class: "prop-name" }, "spacing-lg"),
+                  h.span({ class: "prop-default" }, "24px"),
                   "Component margins, card padding",
                 ],
                 [
-                  H.span({ class: "prop-name" }, "spacing-xl"),
-                  H.span({ class: "prop-default" }, "40px"),
+                  h.span({ class: "prop-name" }, "spacing-xl"),
+                  h.span({ class: "prop-default" }, "40px"),
                   "Page padding, section spacing",
                 ],
               ],
             }),
           ),
-          H.section(
+          h.section(
             { id: "code-blocks" },
             sectionHeading(ctx, { title: "Code Blocks", href: "#code-blocks" }),
             bodyText(ctx, {
               content:
                 "Code blocks come in two variants: basic blocks for simple snippets and enhanced blocks with header, filename, language badge, and copy functionality.",
             }),
-            H.div(
+            h.div(
               { id: "code-basic" },
               subsectionHeading(ctx, { title: "Basic Usage" }),
             ),
             codeBlock(ctx, {
-              content: H.codeTag(
-                H.span({ class: "keyword" }, "const"),
+              content: h.codeTag(
+                h.span({ class: "keyword" }, "const"),
                 " greeting = ",
-                H.span({ class: "string" }, '"Hello, World!"'),
+                h.span({ class: "string" }, '"Hello, World!"'),
                 ";",
               ),
             }),
-            H.div(
+            h.div(
               { id: "code-enhanced" },
               subsectionHeading(ctx, { title: "Enhanced Block" }),
             ),
@@ -582,41 +707,41 @@ const pageHtml = (request: Request): string => {
               filename: "design-system.ts",
               language: "TypeScript",
               languageClass: "ts",
-              content: H.pre(
-                H.codeTag(
-                  H.div(
+              content: h.pre(
+                h.codeTag(
+                  h.div(
                     { class: "code-line" },
-                    H.span({ class: "line-number" }, "1"),
-                    H.span(
+                    h.span({ class: "line-number" }, "1"),
+                    h.span(
                       { class: "line-content" },
-                      H.span({ class: "keyword" }, "export interface"),
+                      h.span({ class: "keyword" }, "export interface"),
                       " Config {",
                     ),
                   ),
-                  H.div(
+                  h.div(
                     { class: "code-line highlighted" },
-                    H.span({ class: "line-number" }, "2"),
-                    H.span(
+                    h.span({ class: "line-number" }, "2"),
+                    h.span(
                       { class: "line-content" },
                       "  theme: ",
-                      H.span({ class: "string" }, "'light'"),
+                      h.span({ class: "string" }, "'light'"),
                       " | ",
-                      H.span({ class: "string" }, "'dark'"),
+                      h.span({ class: "string" }, "'dark'"),
                       ";",
                     ),
                   ),
-                  H.div(
+                  h.div(
                     { class: "code-line highlighted" },
-                    H.span({ class: "line-number" }, "3"),
-                    H.span(
+                    h.span({ class: "line-number" }, "3"),
+                    h.span(
                       { class: "line-content" },
                       "  accentColor: string;",
                     ),
                   ),
-                  H.div(
+                  h.div(
                     { class: "code-line" },
-                    H.span({ class: "line-number" }, "4"),
-                    H.span({ class: "line-content" }, "}"),
+                    h.span({ class: "line-number" }, "4"),
+                    h.span({ class: "line-content" }, "}"),
                   ),
                 ),
               ),
@@ -627,16 +752,16 @@ const pageHtml = (request: Request): string => {
               title: "Line Highlighting",
               icon: icons.tip,
               variant: "tip",
-              content: H.span(
+              content: h.span(
                 "Add the ",
-                H.codeTag(".highlighted"),
+                h.codeTag(".highlighted"),
                 " class to ",
-                H.codeTag(".code-line"),
+                h.codeTag(".code-line"),
                 " elements to emphasize specific lines with an orange background.",
               ),
             }),
           ),
-          H.section(
+          h.section(
             { id: "tabs" },
             sectionHeading(ctx, { title: "Tabs", href: "#tabs" }),
             bodyText(ctx, {
@@ -653,8 +778,8 @@ const pageHtml = (request: Request): string => {
                     languageClass: "bash",
                     copyLabel: "Copy",
                     copyIcon: icons.copy,
-                    content: H.pre(
-                      H.codeTag("npm install package-name"),
+                    content: h.pre(
+                      h.codeTag("npm install package-name"),
                     ),
                   }),
                 },
@@ -665,8 +790,8 @@ const pageHtml = (request: Request): string => {
                     language: "bash",
                     languageClass: "bash",
                     copyLabel: "Copy",
-                    content: H.pre(
-                      H.codeTag("pnpm add package-name"),
+                    content: h.pre(
+                      h.codeTag("pnpm add package-name"),
                     ),
                   }),
                 },
@@ -677,8 +802,8 @@ const pageHtml = (request: Request): string => {
                     language: "bash",
                     languageClass: "bash",
                     copyLabel: "Copy",
-                    content: H.pre(
-                      H.codeTag("yarn add package-name"),
+                    content: h.pre(
+                      h.codeTag("yarn add package-name"),
                     ),
                   }),
                 },
@@ -689,22 +814,22 @@ const pageHtml = (request: Request): string => {
                     language: "bash",
                     languageClass: "bash",
                     copyLabel: "Copy",
-                    content: H.pre(
-                      H.codeTag("bun add package-name"),
+                    content: h.pre(
+                      h.codeTag("bun add package-name"),
                     ),
                   }),
                 },
               ],
             }),
           ),
-          H.section(
+          h.section(
             { id: "callouts" },
             sectionHeading(ctx, { title: "Callouts", href: "#callouts" }),
             bodyText(ctx, {
               content:
                 "Callouts draw attention to important information. Use them sparingly to maintain impact. Three semantic variants are available.",
             }),
-            H.div(
+            h.div(
               { id: "callout-default" },
               subsectionHeading(ctx, { title: "Default" }),
             ),
@@ -714,7 +839,7 @@ const pageHtml = (request: Request): string => {
               content:
                 "This is a default callout for important warnings or prerequisites that users should be aware of before proceeding.",
             }),
-            H.div(
+            h.div(
               { id: "callout-info" },
               subsectionHeading(ctx, { title: "Info Variant" }),
             ),
@@ -725,7 +850,7 @@ const pageHtml = (request: Request): string => {
               content:
                 "Use .callout.info for additional context or explanations that help users understand concepts better.",
             }),
-            H.div(
+            h.div(
               { id: "callout-tip" },
               subsectionHeading(ctx, { title: "Tip Variant" }),
             ),
@@ -737,7 +862,7 @@ const pageHtml = (request: Request): string => {
                 "Use .callout.tip for best practices, recommendations, and helpful suggestions that improve the user experience.",
             }),
           ),
-          H.section(
+          h.section(
             { id: "cards" },
             sectionHeading(ctx, { title: "Feature Cards", href: "#cards" }),
             bodyText(ctx, {
@@ -773,7 +898,7 @@ const pageHtml = (request: Request): string => {
               ],
             }),
           ),
-          H.section(
+          h.section(
             { id: "accordion" },
             sectionHeading(ctx, { title: "Accordion", href: "#accordion" }),
             bodyText(ctx, {
@@ -784,11 +909,11 @@ const pageHtml = (request: Request): string => {
               items: [
                 {
                   title: "How do I customize the accent color?",
-                  content: H.span(
+                  content: h.span(
                     "Find all instances of ",
-                    H.codeTag("#f97316"),
+                    h.codeTag("#f97316"),
                     " in the CSS and replace with your preferred color. Also update the hover state color ",
-                    H.codeTag("#ea580c"),
+                    h.codeTag("#ea580c"),
                     " to a darker shade of your accent.",
                   ),
                   icon: icons.chevronDown,
@@ -796,22 +921,22 @@ const pageHtml = (request: Request): string => {
                 },
                 {
                   title: "Can I use this with React?",
-                  content: H.span(
+                  content: h.span(
                     "Yes! The HTML structure and CSS classes can be directly used in JSX. Just convert ",
-                    H.codeTag("class"),
+                    h.codeTag("class"),
                     " to ",
-                    H.codeTag("className"),
+                    h.codeTag("className"),
                     " and add state management for interactive components.",
                   ),
                   icon: icons.chevronDown,
                 },
                 {
                   title: "Is dark mode supported?",
-                  content: H.span(
+                  content: h.span(
                     "The theme toggle button is included in the sidebar. To implement dark mode, add a ",
-                    H.codeTag(".dark"),
+                    h.codeTag(".dark"),
                     " class to ",
-                    H.codeTag("<body>"),
+                    h.codeTag("<body>"),
                     " and define CSS custom properties with dark values.",
                   ),
                   icon: icons.chevronDown,
@@ -819,7 +944,7 @@ const pageHtml = (request: Request): string => {
               ],
             }),
           ),
-          H.section(
+          h.section(
             { id: "file-tree" },
             sectionHeading(ctx, { title: "File Tree", href: "#file-tree" }),
             bodyText(ctx, {
@@ -828,37 +953,37 @@ const pageHtml = (request: Request): string => {
             }),
             fileTree(ctx, {
               items: [
-                H.div(
+                h.div(
                   { class: "file-tree-item folder" },
                   icons.folderIcon,
                   "project-root",
                 ),
-                H.div(
+                h.div(
                   { class: "file-tree-children" },
-                  H.div(
+                  h.div(
                     { class: "file-tree-item folder" },
                     icons.folderIcon,
                     "src",
                   ),
-                  H.div(
+                  h.div(
                     { class: "file-tree-children" },
-                    H.div(
+                    h.div(
                       { class: "file-tree-item file file-ts" },
                       icons.fileIcon,
                       "index.ts",
                     ),
-                    H.div(
+                    h.div(
                       { class: "file-tree-item file file-css" },
                       icons.fileIcon,
                       "styles.css",
                     ),
                   ),
-                  H.div(
+                  h.div(
                     { class: "file-tree-item file file-json" },
                     icons.fileIcon,
                     "package.json",
                   ),
-                  H.div(
+                  h.div(
                     { class: "file-tree-item file file-md" },
                     icons.fileIcon,
                     "README.md",
@@ -867,7 +992,7 @@ const pageHtml = (request: Request): string => {
               ],
             }),
           ),
-          H.section(
+          h.section(
             { id: "steps" },
             sectionHeading(ctx, { title: "Steps", href: "#steps" }),
             bodyText(ctx, {
@@ -894,47 +1019,43 @@ const pageHtml = (request: Request): string => {
               ],
             }),
           ),
-          H.section(
+          h.section(
             { id: "tables" },
             sectionHeading(ctx, { title: "API Tables", href: "#tables" }),
             bodyText(ctx, {
               content:
                 "API tables display structured data like component props, configuration options, or function parameters with consistent styling.",
             }),
-            H.div(
+            h.div(
               { id: "table-props" },
               subsectionHeading(ctx, { title: "Props Table" }),
             ),
             apiTable(ctx, {
               head: ["Property", "Type", "Default", "Description"],
               rows: [
-                [
-                  combineHast(
-                    H.span({ class: "prop-name" }, "variant"),
-                    H.span({ class: "prop-required" }, "required"),
-                  ),
-                  H.span({ class: "prop-type" }, '"default" | "info" | "tip"'),
-                  H.span({ class: "prop-default" }, "—"),
-                  "Visual style variant for the callout",
-                ],
-                [
-                  H.span({ class: "prop-name" }, "title"),
-                  H.span({ class: "prop-type" }, "string"),
-                  H.span({ class: "prop-default" }, "undefined"),
-                  "Header text displayed with icon",
-                ],
-                [
-                  combineHast(
-                    H.span({ class: "prop-name" }, "children"),
-                    H.span({ class: "prop-required" }, "required"),
-                  ),
-                  H.span({ class: "prop-type" }, "ReactNode"),
-                  H.span({ class: "prop-default" }, "—"),
-                  "Content to display inside the callout",
-                ],
+                apiPropRow(ctx, {
+                  name: "variant",
+                  type: '"default" | "info" | "tip"',
+                  defaultValue: "—",
+                  required: true,
+                  description: "Visual style variant for the callout",
+                }),
+                apiPropRow(ctx, {
+                  name: "title",
+                  type: "string",
+                  defaultValue: "undefined",
+                  description: "Header text displayed with icon",
+                }),
+                apiPropRow(ctx, {
+                  name: "children",
+                  type: "ReactNode",
+                  defaultValue: "—",
+                  required: true,
+                  description: "Content to display inside the callout",
+                }),
               ],
             }),
-            H.div(
+            h.div(
               { id: "table-events" },
               subsectionHeading(ctx, { title: "Events Table" }),
             ),
@@ -946,7 +1067,7 @@ const pageHtml = (request: Request): string => {
               ],
             }),
           ),
-          H.section(
+          h.section(
             { id: "badges" },
             sectionHeading(ctx, { title: "Badges", href: "#badges" }),
             bodyText(ctx, {
@@ -955,27 +1076,26 @@ const pageHtml = (request: Request): string => {
             }),
             exampleWrapper(ctx, {
               label: "All Variants",
-              content: H.div(
-                { class: "badge-row" },
-                badge(ctx, { label: "Default", variant: "default" }),
-                badge(ctx, { label: "Primary", variant: "primary" }),
-                badge(ctx, { label: "Success", variant: "success" }),
-                badge(ctx, { label: "Warning", variant: "warning" }),
-                badge(ctx, { label: "Error", variant: "error" }),
-                badge(ctx, { label: "Info", variant: "info" }),
-              ),
+              content: badgeRow(ctx, [
+                { label: "Default", variant: "default" },
+                { label: "Primary", variant: "primary" },
+                { label: "Success", variant: "success" },
+                { label: "Warning", variant: "warning" },
+                { label: "Error", variant: "error" },
+                { label: "Info", variant: "info" },
+              ]),
             }),
             bodyText(ctx, {
               content: combineHast(
-                H.span(
+                h.span(
                   "Use badges inline with text to highlight status: The API is ",
                 ),
                 badge(ctx, { label: "Stable", variant: "success" }),
-                H.span(" and ready for production use."),
+                h.span(" and ready for production use."),
               ),
             }),
           ),
-          H.section(
+          h.section(
             { id: "keyboard" },
             sectionHeading(ctx, {
               title: "Keyboard Shortcuts",
@@ -987,30 +1107,11 @@ const pageHtml = (request: Request): string => {
             }),
             exampleWrapper(ctx, {
               label: "Examples",
-              content: H.div(
-                { class: "keyboard-row" },
-                H.div(
-                  H.span(
-                    { class: "keyboard-label" },
-                    "Search:",
-                  ),
-                  keyboardShortcut(ctx, { keys: ["Cmd", "K"] }),
-                ),
-                H.div(
-                  H.span(
-                    { class: "keyboard-label" },
-                    "Save:",
-                  ),
-                  keyboardShortcut(ctx, { keys: ["Ctrl", "S"] }),
-                ),
-                H.div(
-                  H.span(
-                    { class: "keyboard-label" },
-                    "Copy:",
-                  ),
-                  keyboardShortcut(ctx, { keys: ["Cmd", "C"] }),
-                ),
-              ),
+              content: keyboardShortcutList(ctx, [
+                { label: "Search:", keys: ["Cmd", "K"] },
+                { label: "Save:", keys: ["Ctrl", "S"] },
+                { label: "Copy:", keys: ["Cmd", "C"] },
+              ]),
             }),
           ),
           imageWithCaption(ctx, {
@@ -1093,8 +1194,8 @@ const pageHtml = (request: Request): string => {
     headSlots: headSlots({
       title: "Natural DS Reference",
       meta: [
-        H.meta({ charset: "utf-8" }),
-        H.meta({
+        h.meta({ charset: "utf-8" }),
+        h.meta({
           name: "viewport",
           content: "width=device-width, initial-scale=1",
         }),
@@ -1103,7 +1204,7 @@ const pageHtml = (request: Request): string => {
     styleAttributeEmitStrategy: "head",
   });
 
-  return H.render(page);
+  return h.render(page);
 };
 
 const renderGitHubSidebar = (
@@ -1205,55 +1306,21 @@ const renderGitHubContent = (
   const iframeSrc = `${GITHUB_PROXY_BASE_URL}${
     repo.path ?? repo.url.slice("https://github.com".length)
   }`;
-  return H.div(
+  return h.div(
     pageHeader(ctx, {
       title: "GitHub Explorer",
       description:
         "Browse the latest repositories from each organization without leaving the Natural DS shell.",
     }),
-    callout(ctx, {
-      title: `${subject.title} • ${subject.org}`,
-      icon: icons.github,
-      variant: "info",
-      content: H.div(
-        H.p(subject.description),
-        H.p(
-          H.span("Viewing: "),
-          H.strong(repo.name),
-          " — ",
-          repo.description,
-        ),
-        H.p(
-          H.a(
-            {
-              href: repo.url,
-              target: "_blank",
-              rel: "noreferrer",
-            },
-            "Open on GitHub",
-          ),
-        ),
-      ),
+    githubRepoPreview(ctx, {
+      subjectLabel: subject.title,
+      subjectOrg: subject.org,
+      subjectDescription: subject.description,
+      repoName: repo.name,
+      repoDescription: repo.description,
+      repoUrl: repo.url,
+      iframeSrc,
     }),
-    bodyText(ctx, {
-      content:
-        "Switch subjects or repositories from the sidebar to update the embedded preview. If you see a `404` or similar error, it might be a private repo.",
-    }),
-    H.section(
-      {
-        class: "github-iframe",
-        style:
-          "margin-top: 24px; background:#ffffff; border-radius:12px; box-shadow:0 12px 40px rgba(15,23,42,0.15);",
-      },
-      H.iframe({
-        src: iframeSrc,
-        title: `${repo.name} repository`,
-        style:
-          "width: 100%; min-height: 640px; border: 1px solid #e5e5e5; border-radius: 12px;",
-        loading: "lazy",
-        referrerpolicy: "no-referrer",
-      }),
-    ),
   );
 };
 
@@ -1274,7 +1341,7 @@ const gitHubPageHtml = (
     styleAttributeEmitStrategy: "head",
   });
 
-  return H.render(page);
+  return h.render(page);
 };
 
 const respondGitHubPage = (
