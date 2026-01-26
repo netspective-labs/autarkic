@@ -1,3 +1,4 @@
+import type { RenderCtx } from "../../natural-html/design-system.ts";
 import {
   type ComponentStylesheets,
   defineComponent,
@@ -256,3 +257,82 @@ export const contextHeaderContent = defineComponent<
       ),
     ),
 );
+
+export type ContextNavEntry = {
+  readonly label: string;
+  readonly href?: string;
+  readonly icon?: Content<RenderInput, NamingStrategy>;
+  readonly active?: boolean;
+};
+
+export type ContextAction = {
+  readonly label: string;
+  readonly icon: Content<RenderInput, NamingStrategy>;
+  readonly badge?: boolean;
+};
+
+export type ContextUserInfo = {
+  readonly initials: string;
+  readonly name: string;
+  readonly chevron?: h.RawHtml;
+};
+
+export class NaturalContextBarBuilder {
+  readonly #ctx: RenderCtx<RenderInput, NamingStrategy>;
+  #brand?: ContextBrandProps;
+  #navEntries: ContextNavEntry[] = [];
+  #actions: ContextAction[] = [];
+  #user?: ContextUserInfo;
+
+  constructor(ctx: RenderCtx<RenderInput, NamingStrategy>) {
+    this.#ctx = ctx;
+  }
+
+  withBrand(brand: ContextBrandProps): this {
+    this.#brand = brand;
+    return this;
+  }
+
+  withNavEntries(entries: ContextNavEntry[]): this {
+    this.#navEntries = entries;
+    return this;
+  }
+
+  withActions(actions: ContextAction[]): this {
+    this.#actions = actions;
+    return this;
+  }
+
+  withUser(user: ContextUserInfo): this {
+    this.#user = user;
+    return this;
+  }
+
+  build(): h.RawHtml {
+    if (!this.#brand) throw new Error("Context bar requires a brand.");
+    if (!this.#user) throw new Error("Context bar requires a user.");
+
+    const nav = this.#navEntries.map((entry) =>
+      contextNavLink(this.#ctx, {
+        label: entry.label,
+        href: entry.href,
+        icon: entry.icon,
+        active: entry.active,
+      })
+    );
+    const actions = this.#actions.map((action) =>
+      contextIconButton(this.#ctx, {
+        label: action.label,
+        icon: action.icon,
+        badge: action.badge,
+      })
+    );
+
+    return contextHeaderContent(this.#ctx, {
+      brand: contextBrand(this.#ctx, this.#brand),
+      nav,
+      actions,
+      user: contextUser(this.#ctx, this.#user),
+    });
+  }
+}
