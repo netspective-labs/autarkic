@@ -21,8 +21,8 @@ import {
 } from "../../../lib/continuux/http-ux/aide.ts";
 import { Application } from "../../../lib/continuux/http.ts";
 import {
+  actionSchemas,
   createCx,
-  defineSchemas,
 } from "../../../lib/continuux/interaction-html.ts";
 import {
   type CxHandlerResult,
@@ -42,7 +42,7 @@ const interactivityAide = <
 >(
   state: State,
 ) => {
-  const schemas = defineSchemas({
+  const actions = actionSchemas({
     increment: decodeCxEnvelope,
     reset: decodeCxEnvelope,
   });
@@ -54,7 +54,7 @@ const interactivityAide = <
     readonly connection: SseDiagnosticEntry;
   };
 
-  const cx = createCx<State, Vars, typeof schemas, ServerEvents>(schemas);
+  const cx = createCx<State, Vars, typeof actions, ServerEvents>(actions);
   const hub = cx.server.sseHub();
   const builder = new CxMiddlewareBuilder<ServerEvents>({
     hub,
@@ -93,7 +93,7 @@ const interactivityAide = <
     return { ok: true };
   };
 
-  const middleware = builder.middleware<State, Vars, typeof schemas, "action">({
+  const middleware = builder.middleware<State, Vars, typeof actions, "action">({
     uaCacheControl: "no-store",
     onConnect: async ({ session, sessionId }) => {
       await session.sendWhenReady("js", setText("count", String(state.count)));
@@ -124,8 +124,8 @@ const interactivityAide = <
     cx,
     middleware,
     sseDiagnostics,
-    sseDiagsElement: sseDiagsElement,
-    sseDiagsElementId: sseDiagsElementId,
+    sseDiagsElement,
+    sseDiagsElementId,
   };
 };
 

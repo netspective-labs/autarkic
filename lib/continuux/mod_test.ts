@@ -22,7 +22,7 @@ import {
   userAgentAide,
 } from "./interaction.ts";
 
-import { createCx, cxPostHandler, defineSchemas } from "./interaction-html.ts";
+import { actionSchemas, createCx, cxPostHandler } from "./interaction-html.ts";
 import { cxSseRegister } from "./interaction.ts";
 
 import {
@@ -71,7 +71,7 @@ Deno.test("continuux: counter e2e (interaction-html.ts + browser-ua-aide.js)", a
 
   type Vars = Record<string, never>;
 
-  const schemas = defineSchemas({
+  const actions = actionSchemas({
     increment: (u: unknown) => decodeCxEnvelope(u),
     reset: (u: unknown) => decodeCxEnvelope(u),
   });
@@ -79,9 +79,9 @@ Deno.test("continuux: counter e2e (interaction-html.ts + browser-ua-aide.js)", a
   const cx = createCx<
     State,
     Vars,
-    typeof schemas,
+    typeof actions,
     { js: string; message: string }
-  >(schemas);
+  >(actions);
 
   const hub = cx.server.sseHub();
   const posts: CxInbound[] = [];

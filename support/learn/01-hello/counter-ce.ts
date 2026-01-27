@@ -8,8 +8,8 @@
 
 import { Application } from "../../../lib/continuux/http.ts";
 import {
+  actionSchemas,
   createCx,
-  defineSchemas,
 } from "../../../lib/continuux/interaction-html.ts";
 import {
   type CxHandlerResult,
@@ -32,7 +32,7 @@ const interactivityAide = <
 >(
   state: State,
 ) => {
-  const schemas = defineSchemas({
+  const actions = actionSchemas({
     increment: decodeCxEnvelope,
     reset: decodeCxEnvelope,
   });
@@ -42,7 +42,7 @@ const interactivityAide = <
     readonly status: { text: string };
   };
 
-  const cx = createCx<State, Vars, typeof schemas, ServerEvents>(schemas);
+  const cx = createCx<State, Vars, typeof actions, ServerEvents>(actions);
   const builder = new CxMiddlewareBuilder<ServerEvents>({
     sseUrl: "/ce/sse",
     postUrl: "/ce/action",
@@ -65,7 +65,7 @@ const interactivityAide = <
     return { ok: true };
   };
 
-  const middleware = builder.middleware<State, Vars, typeof schemas, "action">({
+  const middleware = builder.middleware<State, Vars, typeof actions, "action">({
     uaCacheControl: "no-store",
     onConnect: async ({ session }) => {
       await session.sendWhenReady("count", { value: state.count });

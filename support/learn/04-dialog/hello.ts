@@ -18,9 +18,9 @@ import {
 } from "../../../lib/continuux/http-ux/aide.ts";
 import { Application, htmlResponse } from "../../../lib/continuux/http.ts";
 import {
+  actionSchemas,
   createCx,
   type CxActionHandlers,
-  defineSchemas,
 } from "../../../lib/continuux/interaction-html.ts";
 import {
   CxMiddlewareBuilder,
@@ -190,7 +190,7 @@ const interactivityAide = <
   State extends { submissions: FormSubmission[] },
   Vars extends Record<string, unknown>,
 >(_state: State) => {
-  const schemas = defineSchemas({
+  const actions = actionSchemas({
     validateField: decodeCxEnvelope,
     submitForm: decodeCxEnvelope,
   });
@@ -201,7 +201,7 @@ const interactivityAide = <
     readonly connection: SseDiagnosticEntry;
   };
 
-  const cx = createCx<State, Vars, typeof schemas, ServerEvents>(schemas);
+  const cx = createCx<State, Vars, typeof actions, ServerEvents>(actions);
   const hub = cx.server.sseHub();
   const sseDiagnostics = createSseDiagnostics(hub, "diag", "connection");
   const builder = new CxMiddlewareBuilder<ServerEvents>({ hub });
@@ -218,7 +218,7 @@ const interactivityAide = <
   const handlers: CxActionHandlers<
     State,
     Vars,
-    typeof schemas,
+    typeof actions,
     ServerEvents,
     "action"
   > = {
@@ -278,7 +278,7 @@ const interactivityAide = <
     },
   };
 
-  const middleware = builder.middleware<State, Vars, typeof schemas, "action">({
+  const middleware = builder.middleware<State, Vars, typeof actions, "action">({
     uaCacheControl: "no-store",
     onConnect: async ({ session, sessionId }) => {
       await session.sendWhenReady(

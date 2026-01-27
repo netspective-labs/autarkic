@@ -661,7 +661,7 @@ export const createCx = <
  * Convenience: defineSchemas()
  * ========================= */
 
-export const defineSchemas = <S extends CxActionSchemas>(schemas: S): S =>
+export const actionSchemas = <S extends CxActionSchemas>(schemas: S): S =>
   schemas;
 
 /* =========================
