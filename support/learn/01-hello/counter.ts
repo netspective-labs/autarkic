@@ -15,20 +15,22 @@
  *   deno run -A support/learn/01-hello/counter.ts
  */
 
-import * as H from "../../../lib/natural-html/elements.ts";
-import { Application, textResponse } from "../../../lib/continuux/http.ts";
-import {
-  createCx,
-  cxPostHandler,
-  cxSseRegister,
-  defineSchemas,
-} from "../../../lib/continuux/interaction-html.ts";
-import { decodeCxEnvelope } from "../../../lib/continuux/interaction.ts";
-import { customElement } from "../../../lib/natural-html/elements.ts";
 import {
   createSseDiagnostics,
   type SseDiagnosticEntry,
 } from "../../../lib/continuux/http-ux/aide.ts";
+import { Application } from "../../../lib/continuux/http.ts";
+import {
+  createCx,
+  type CxActionHandlers,
+  defineSchemas,
+} from "../../../lib/continuux/interaction-html.ts";
+import {
+  CxMiddlewareBuilder,
+  decodeCxEnvelope,
+} from "../../../lib/continuux/interaction.ts";
+import * as H from "../../../lib/natural-html/elements.ts";
+import { customElement } from "../../../lib/natural-html/elements.ts";
 
 type State = { count: number };
 type Vars = Record<string, never>;
@@ -52,26 +54,58 @@ type ServerEvents = {
 
 const cx = createCx<State, Vars, typeof schemas, ServerEvents>(schemas);
 const hub = cx.server.sseHub();
+const builder = new CxMiddlewareBuilder<ServerEvents>({
+  hub,
+  postUrl: "/cx",
+  sseUrl: "/cx/sse",
+  importUrl: "/browser-ua-aide.js",
+});
+const { setText, setDataset } = builder.domJs;
 const sseDiagnostics = createSseDiagnostics(hub, "diag", "connection");
 
-const setTextJs = (id: string, text: string) =>
-  `{
-  const __el = document.getElementById(${JSON.stringify(id)});
-  if (__el) __el.textContent = ${JSON.stringify(text)};
-}`;
-
-const setDatasetJs = (k: string, v: string) =>
-  `{
-  try { document.body.dataset[${JSON.stringify(k)}] = ${JSON.stringify(v)}; }
-  catch {}
-}`;
-
-const sendDiagEvent = (
-  sessionId: string | undefined,
-  entry: Partial<SseDiagnosticEntry>,
-) => {
-  if (!sessionId) return;
-  sseDiagnostics.diag(sessionId, entry);
+const handlers: CxActionHandlers<
+  State,
+  Vars,
+  typeof schemas,
+  ServerEvents,
+  "action"
+> = {
+  increment: ({ cx: env, sessionId }) => {
+    appState.count += 1;
+    const js = [
+      setText("count", String(appState.count)),
+      setText("status", "ok:increment"),
+      setDataset("lastSpec", env.spec),
+      setDataset("lastCount", String(appState.count)),
+    ].join("\n");
+    hub.broadcast("js", js);
+    if (sessionId) {
+      sseDiagnostics.diag(sessionId, {
+        message: `increment`,
+        level: "info",
+        payload: { sessionId, count: appState.count, execDomJS: js },
+      });
+    }
+    return { ok: true };
+  },
+  reset: ({ cx: env, sessionId }) => {
+    appState.count = 0;
+    const js = [
+      setText("count", "0"),
+      setText("status", "ok:reset"),
+      setDataset("lastSpec", env.spec),
+      setDataset("lastCount", "0"),
+    ].join("\n");
+    hub.broadcast("js", js);
+    if (sessionId) {
+      sseDiagnostics.diag(sessionId, {
+        message: `reset`,
+        level: "info",
+        payload: { sessionId, count: appState.count, execDomJS: js },
+      });
+    }
+    return { ok: true };
+  },
 };
 
 const pageHtml = (): string => {
@@ -174,11 +208,32 @@ const app = Application.sharedState<State, Vars>(appState);
 // Serve the inspector module via middleware (instead of app.get(...)).
 app.use(sseDiagnostics.middleware<State, Vars>());
 
-// Serve the unified UA module at the URL used by the page boot script.
-app.get("/browser-ua-aide.js", async () => {
-  return await cx.server.uaModuleResponse("no-store");
-});
-
+app.use(
+  builder.middleware<State, Vars, typeof schemas, "action">({
+    uaCacheControl: "no-store",
+    onConnect: async ({ session, sessionId }) => {
+      await session.sendWhenReady(
+        "js",
+        setText("count", String(appState.count)),
+      );
+      await session.sendWhenReady(
+        "js",
+        setDataset("lastCount", String(appState.count)),
+      );
+      await session.sendWhenReady("js", setDataset("lastSpec", "init"));
+      await session.sendWhenReady("js", setText("status", "connected"));
+      await session.sendWhenReady("message", `connected:${sessionId}`);
+      sseDiagnostics.connection(sessionId, {
+        message: "SSE diagnostics channel established",
+        level: "info",
+      });
+    },
+    post: {
+      cx,
+      handlers,
+    },
+  }),
+);
 app.get(
   "/",
   () =>
@@ -186,80 +241,5 @@ app.get(
       headers: { "content-type": "text/html; charset=utf-8" },
     }),
 );
-
-app.get(
-  "/cx/sse",
-  (c) =>
-    c.sse<ServerEvents>(async (session) => {
-      const sessionId = c.query("sessionId") ?? "unknown";
-      cxSseRegister(hub, sessionId, session);
-
-      await session.sendWhenReady(
-        "js",
-        setTextJs("count", String(appState.count)),
-      );
-      await session.sendWhenReady(
-        "js",
-        setDatasetJs("lastCount", String(appState.count)),
-      );
-      await session.sendWhenReady("js", setDatasetJs("lastSpec", "init"));
-      await session.sendWhenReady("js", setTextJs("status", "connected"));
-      await session.sendWhenReady("message", `connected:${sessionId}`);
-      sseDiagnostics.connection(sessionId, {
-        message: "SSE diagnostics channel established",
-        level: "info",
-      });
-    }),
-);
-
-app.post("/cx", async (c) => {
-  const bodyU = await c.readJson();
-
-  const r = await cxPostHandler(cx, {
-    req: c.req,
-    body: bodyU,
-    state: appState,
-    vars: c.vars,
-    sse: hub,
-    handlers: {
-      increment: ({ cx: env, sessionId }) => {
-        appState.count += 1;
-        const js = [
-          setTextJs("count", String(appState.count)),
-          setTextJs("status", "ok:increment"),
-          setDatasetJs("lastSpec", env.spec),
-          setDatasetJs("lastCount", String(appState.count)),
-        ].join("\n");
-        hub.broadcast("js", js);
-        sendDiagEvent(sessionId, {
-          message: `increment`,
-          level: "info",
-          payload: { sessionId, count: appState.count, execDomJS: js },
-        });
-        return { ok: true };
-      },
-
-      reset: ({ cx: env, sessionId }) => {
-        appState.count = 0;
-        const js = [
-          setTextJs("count", "0"),
-          setTextJs("status", "ok:reset"),
-          setDatasetJs("lastSpec", env.spec),
-          setDatasetJs("lastCount", "0"),
-        ].join("\n");
-        hub.broadcast("js", js);
-        sendDiagEvent(sessionId, {
-          message: `reset`,
-          level: "info",
-          payload: { sessionId, count: appState.count, execDomJS: js },
-        });
-        return { ok: true };
-      },
-    },
-  });
-
-  if (r.ok) return new Response(null, { status: 204 });
-  return textResponse(r.message, r.status);
-});
 
 app.serve({ port: 7681 });

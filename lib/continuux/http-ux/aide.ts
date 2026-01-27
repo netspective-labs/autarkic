@@ -1,5 +1,5 @@
 import type { Middleware } from "../http.ts";
-import type { CxSseHub } from "../interaction-html.ts";
+import type { CxSseHub } from "../interaction.ts";
 
 export type SseDiagnosticLevel = "info" | "warn" | "error" | "debug";
 

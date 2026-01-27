@@ -78,15 +78,20 @@
 
 import type { Attrs, RawHtml } from "../natural-html/elements.ts";
 import { script, trustedRaw } from "../natural-html/elements.ts";
-import type { SseEventMap, SseSession } from "./http.ts";
+import type { SseEventMap } from "./http.ts";
 import type {
   CxDomEventName,
   CxHandlerResult,
   CxInbound,
+  CxSseHub,
   SchemaLike,
   UserAgentAide,
 } from "./interaction.ts";
-import { decodeCxEnvelope, userAgentAide } from "./interaction.ts";
+import {
+  createSseHub,
+  decodeCxEnvelope,
+  userAgentAide,
+} from "./interaction.ts";
 
 /* =========================
  * shared types
@@ -319,111 +324,6 @@ export type CxKit<
     toResponse: (r: CxHandlerResult) => Response;
 
     sseHub: () => CxSseHub<SseOut>;
-  };
-};
-
-/* =========================
- * SSE hub (typed server -> client events)
- * ========================= */
-
-export type CxSseHub<E extends SseEventMap> = {
-  register: (sessionId: string, session: SseSession<E>) => void;
-  unregister: (sessionId: string) => void;
-
-  send: <K extends keyof E>(sessionId: string, event: K, data: E[K]) => boolean;
-  broadcast: <K extends keyof E>(event: K, data: E[K]) => void;
-
-  js: (sessionId: string, jsText: string) => boolean;
-  broadcastJs: (jsText: string) => void;
-
-  size: () => number;
-};
-
-const normalizeSessionId = (sid: string | null | undefined): string | null => {
-  const s = (sid ?? "").trim();
-  if (!s) return null;
-  if (s === "unknown") return null;
-  return s;
-};
-
-const createSseHub = <E extends SseEventMap>(): CxSseHub<E> => {
-  const sessions = new Map<string, SseSession<E>>();
-
-  const unregister = (sessionId: string) => {
-    const sid = normalizeSessionId(sessionId);
-    if (!sid) return;
-
-    const s = sessions.get(sid);
-    if (s) {
-      try {
-        s.close();
-      } catch {
-        // ignore
-      }
-    }
-    sessions.delete(sid);
-  };
-
-  const register = (sessionId: string, session: SseSession<E>) => {
-    const sid = normalizeSessionId(sessionId);
-    if (!sid) {
-      try {
-        session.close();
-      } catch {
-        // ignore
-      }
-      return;
-    }
-
-    unregister(sid);
-    sessions.set(sid, session);
-
-    queueMicrotask(() => {
-      if (session.isClosed()) sessions.delete(sid);
-    });
-  };
-
-  const send = <K extends keyof E>(sessionId: string, event: K, data: E[K]) => {
-    const sid = normalizeSessionId(sessionId);
-    if (!sid) return false;
-
-    const s = sessions.get(sid);
-    if (!s || s.isClosed()) {
-      sessions.delete(sid);
-      return false;
-    }
-    const ok = s.send(event, data);
-    if (!ok) sessions.delete(sid);
-    return ok;
-  };
-
-  const broadcast = <K extends keyof E>(event: K, data: E[K]) => {
-    for (const [sid, s] of sessions) {
-      if (s.isClosed()) {
-        sessions.delete(sid);
-        continue;
-      }
-      const ok = s.send(event, data);
-      if (!ok) sessions.delete(sid);
-    }
-  };
-
-  const js = (sessionId: string, jsText: string) =>
-    // @ts-expect-error: only valid if E includes "js"
-    send(sessionId, "js", jsText);
-
-  const broadcastJs = (jsText: string) =>
-    // @ts-expect-error: only valid if E includes "js"
-    broadcast("js", jsText);
-
-  return {
-    register,
-    unregister,
-    send,
-    broadcast,
-    js,
-    broadcastJs,
-    size: () => sessions.size,
   };
 };
 
@@ -795,35 +695,6 @@ export const cxPostHandler = async <
   );
 
 /* =========================
- * Convenience: cxSseRegister()
- * ========================= */
-
-export const cxSseRegister = <E extends SseEventMap>(
-  hub: CxSseHub<E>,
-  sessionId: string,
-  session: SseSession<E>,
-): void => {
-  const sid = (sessionId ?? "").trim();
-
-  if (!sid || sid === "unknown") {
-    try {
-      session.close();
-    } catch {
-      // ignore
-    }
-    return;
-  }
-
-  hub.register(sid, session);
-
-  void session.ready.then(() => {
-    queueMicrotask(() => {
-      if (session.isClosed()) hub.unregister(sid);
-    });
-  });
-};
-
-/* =========================
  * OPTIONAL: stricter header/signals helpers
  * ========================= */
 
@@ -840,3 +711,5 @@ export const cxHeaders = (obj: Record<string, string>): Attrs => {
   }
   return { "data-cx-headers": safeJson(obj) };
 };
+
+export { cxSseRegister } from "./interaction.ts";

@@ -21,10 +21,12 @@ import {
   createCx,
   type CxActionHandlers,
   cxPostHandler,
-  cxSseRegister,
   defineSchemas,
 } from "../../../lib/continuux/interaction-html.ts";
-import { decodeCxEnvelope } from "../../../lib/continuux/interaction.ts";
+import {
+  cxSseRegister,
+  decodeCxEnvelope,
+} from "../../../lib/continuux/interaction.ts";
 import {
   checkboxField,
   createDialog,

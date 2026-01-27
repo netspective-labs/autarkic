@@ -22,12 +22,8 @@ import {
   userAgentAide,
 } from "./interaction.ts";
 
-import {
-  createCx,
-  cxPostHandler,
-  cxSseRegister,
-  defineSchemas,
-} from "./interaction-html.ts";
+import { createCx, cxPostHandler, defineSchemas } from "./interaction-html.ts";
+import { cxSseRegister } from "./interaction.ts";
 
 import {
   body,

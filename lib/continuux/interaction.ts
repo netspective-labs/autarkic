@@ -70,6 +70,20 @@
  * through typed JavaScript instructions.
  */
 
+import type {
+  HandlerCtx,
+  Middleware,
+  SseEventMap,
+  SseOptions,
+  SseSession,
+} from "./http.ts";
+import type {
+  CxActionHandlers,
+  CxActionSchemas,
+  CxKit,
+} from "./interaction-html.ts";
+import { cxPostHandler } from "./interaction-html.ts";
+
 export type AttrValue = string | number | boolean | null | undefined;
 export type Attrs = Record<string, AttrValue>;
 
@@ -443,6 +457,156 @@ export const sawDiag = (
   pred?: (d: CxDiagEvent) => boolean,
 ): boolean => diags.some((d) => d.kind === kind && (!pred || pred(d)));
 
+const setTextDomJs = (id: string, text: string) =>
+  `{
+  const __el = document.getElementById(${JSON.stringify(id)});
+  if (__el) __el.textContent = ${JSON.stringify(text)};
+}`;
+
+const setDatasetDomJs = (key: string, value: string) =>
+  `{
+  try { document.body.dataset[${JSON.stringify(key)}] = ${
+    JSON.stringify(value)
+  }; } catch {}
+}`;
+
+export const cxDomJs = {
+  setText: setTextDomJs,
+  setDataset: setDatasetDomJs,
+} as const;
+
+/* =========================
+ * SSE hub helpers
+ * ========================= */
+
+export type CxSseHub<E extends SseEventMap> = {
+  register: (sessionId: string, session: SseSession<E>) => void;
+  unregister: (sessionId: string) => void;
+
+  send: <K extends keyof E>(sessionId: string, event: K, data: E[K]) => boolean;
+  broadcast: <K extends keyof E>(event: K, data: E[K]) => void;
+
+  js: (sessionId: string, jsText: string) => boolean;
+  broadcastJs: (jsText: string) => void;
+
+  size: () => number;
+};
+
+const normalizeSessionId = (
+  sessionId: string | null | undefined,
+): string | null => {
+  const s = (sessionId ?? "").trim();
+  if (!s) return null;
+  if (s === "unknown") return null;
+  return s;
+};
+
+export const createSseHub = <E extends SseEventMap>(): CxSseHub<E> => {
+  const sessions = new Map<string, SseSession<E>>();
+
+  const unregister = (sessionId: string) => {
+    const sid = normalizeSessionId(sessionId);
+    if (!sid) return;
+
+    const s = sessions.get(sid);
+    if (s) {
+      try {
+        s.close();
+      } catch {
+        // ignore
+      }
+    }
+    sessions.delete(sid);
+  };
+
+  const register = (sessionId: string, session: SseSession<E>) => {
+    const sid = normalizeSessionId(sessionId);
+    if (!sid) {
+      try {
+        session.close();
+      } catch {
+        // ignore
+      }
+      return;
+    }
+
+    unregister(sid);
+    sessions.set(sid, session);
+
+    queueMicrotask(() => {
+      if (session.isClosed()) sessions.delete(sid);
+    });
+  };
+
+  const send = <K extends keyof E>(sessionId: string, event: K, data: E[K]) => {
+    const sid = normalizeSessionId(sessionId);
+    if (!sid) return false;
+
+    const s = sessions.get(sid);
+    if (!s || s.isClosed()) {
+      sessions.delete(sid);
+      return false;
+    }
+    const ok = s.send(event, data);
+    if (!ok) sessions.delete(sid);
+    return ok;
+  };
+
+  const broadcast = <K extends keyof E>(event: K, data: E[K]) => {
+    for (const [sid, s] of sessions) {
+      if (s.isClosed()) {
+        sessions.delete(sid);
+        continue;
+      }
+      const ok = s.send(event, data);
+      if (!ok) sessions.delete(sid);
+    }
+  };
+
+  const js = (sessionId: string, jsText: string) =>
+    // @ts-expect-error: only valid if E includes "js"
+    send(sessionId, "js", jsText);
+
+  const broadcastJs = (jsText: string) =>
+    // @ts-expect-error: only valid if E includes "js"
+    broadcast("js", jsText);
+
+  return {
+    register,
+    unregister,
+    send,
+    broadcast,
+    js,
+    broadcastJs,
+    size: () => sessions.size,
+  };
+};
+
+export const cxSseRegister = <E extends SseEventMap>(
+  hub: CxSseHub<E>,
+  sessionId: string,
+  session: SseSession<E>,
+): void => {
+  const sid = (sessionId ?? "").trim();
+
+  if (!sid || sid === "unknown") {
+    try {
+      session.close();
+    } catch {
+      // ignore
+    }
+    return;
+  }
+
+  hub.register(sid, session);
+
+  void session.ready.then(() => {
+    queueMicrotask(() => {
+      if (session.isClosed()) hub.unregister(sid);
+    });
+  });
+};
+
 /* =========================
  * Attributes and UA serving
  * ========================= */
@@ -592,3 +756,169 @@ export const userAgentAide = (
 
   return { attrs, moduleSource, moduleResponse, bootModuleSnippet };
 };
+
+/* =========================
+ * SSE middleware builder
+ * ========================= */
+
+export type CxMiddlewareBuilderConfig<E extends SseEventMap> = {
+  hub?: CxSseHub<E>;
+  attrPrefix?: string;
+  postUrl?: string;
+  sseUrl?: string;
+  importUrl?: string;
+  sseWithCredentials?: boolean;
+  sessionIdParam?: string;
+  sessionIdDefault?: string;
+  sseOptions?: Omit<SseOptions, "signal">;
+};
+
+type CxMiddlewareBuilderResolvedConfig<E extends SseEventMap> = {
+  attrPrefix: string;
+  postUrl: string;
+  sseUrl: string;
+  importUrl: string;
+  sseWithCredentials: boolean;
+  sessionIdParam: string;
+  sessionIdDefault: string;
+  sseOptions?: Omit<SseOptions, "signal">;
+};
+
+export type CxMiddlewareBuilderSessionContext<
+  State extends Record<string, unknown>,
+  Vars extends Record<string, unknown>,
+  E extends SseEventMap,
+> = {
+  c: HandlerCtx<string, State, Vars>;
+  session: SseSession<E>;
+  sessionId: string;
+  hub: CxSseHub<E>;
+};
+
+export type CxMiddlewareBuilderPostOptions<
+  State extends Record<string, unknown>,
+  Vars extends Record<string, unknown>,
+  Schemas extends CxActionSchemas,
+  Prefix extends string,
+  E extends SseEventMap,
+> = {
+  cx: CxKit<State, Vars, Schemas, E, Prefix>;
+  handlers: CxActionHandlers<State, Vars, Schemas, E, Prefix>;
+};
+
+export type CxMiddlewareBuilderMiddlewareOptions<
+  State extends Record<string, unknown>,
+  Vars extends Record<string, unknown>,
+  E extends SseEventMap,
+  Schemas extends CxActionSchemas,
+  Prefix extends string,
+> = {
+  onConnect?: (
+    ctx: CxMiddlewareBuilderSessionContext<State, Vars, E>,
+  ) => Promise<void> | void;
+  sessionIdFrom?: (
+    c: HandlerCtx<string, State, Vars>,
+  ) => string | null;
+  sseOptions?: Omit<SseOptions, "signal">;
+  uaCacheControl?: string;
+  post?: CxMiddlewareBuilderPostOptions<State, Vars, Schemas, Prefix, E>;
+};
+
+export class CxMiddlewareBuilder<E extends SseEventMap> {
+  readonly config: CxMiddlewareBuilderResolvedConfig<E>;
+  readonly hub: CxSseHub<E>;
+  readonly userAgentAide: UserAgentAide;
+  readonly domJs = cxDomJs;
+
+  constructor(cfg: CxMiddlewareBuilderConfig<E> = {}) {
+    this.hub = cfg.hub ?? createSseHub<E>();
+    this.config = {
+      attrPrefix: cfg.attrPrefix ?? "data-cx",
+      postUrl: cfg.postUrl ?? "/cx",
+      sseUrl: cfg.sseUrl ?? "/cx/sse",
+      importUrl: cfg.importUrl ?? "/browser-ua-aide.js",
+      sseWithCredentials: cfg.sseWithCredentials ?? true,
+      sessionIdParam: cfg.sessionIdParam ?? "sessionId",
+      sessionIdDefault: cfg.sessionIdDefault ?? "unknown",
+      sseOptions: cfg.sseOptions,
+    };
+    this.userAgentAide = userAgentAide({
+      attrPrefix: this.config.attrPrefix,
+      defaultPostUrl: this.config.postUrl,
+      defaultSseUrl: this.config.sseUrl,
+      defaultImportUrl: this.config.importUrl,
+    });
+  }
+
+  middleware<
+    State extends Record<string, unknown>,
+    Vars extends Record<string, unknown>,
+    Schemas extends CxActionSchemas = CxActionSchemas,
+    Prefix extends string = string,
+  >(
+    opts: CxMiddlewareBuilderMiddlewareOptions<
+      State,
+      Vars,
+      E,
+      Schemas,
+      Prefix
+    > = {},
+  ): Middleware<State, Vars> {
+    return async (c, next) => {
+      const { req, url } = c;
+      if (req.method === "GET") {
+        if (url.pathname === this.config.importUrl) {
+          return await this.userAgentAide.moduleResponse(
+            opts.uaCacheControl ?? "no-store",
+          );
+        }
+        if (url.pathname === this.config.sseUrl) {
+          const sessionId = this.resolveSessionId(c, opts.sessionIdFrom);
+          return await c.sse<E>(
+            async (session) => {
+              cxSseRegister(this.hub, sessionId, session);
+              if (opts.onConnect) {
+                await opts.onConnect({
+                  c,
+                  session,
+                  sessionId,
+                  hub: this.hub,
+                });
+              }
+            },
+            opts.sseOptions ?? this.config.sseOptions,
+          );
+        }
+      }
+      if (
+        req.method === "POST" &&
+        url.pathname === this.config.postUrl &&
+        opts.post
+      ) {
+        const body = await c.readJson();
+        const result = await cxPostHandler(opts.post.cx, {
+          req: c.req,
+          body,
+          state: c.state,
+          vars: c.vars,
+          handlers: opts.post.handlers,
+          sse: this.hub,
+        });
+        return opts.post.cx.server.toResponse(result);
+      }
+      return await next();
+    };
+  }
+
+  private resolveSessionId<
+    State extends Record<string, unknown>,
+    Vars extends Record<string, unknown>,
+  >(
+    c: HandlerCtx<string, State, Vars>,
+    from?: (c: HandlerCtx<string, State, Vars>) => string | null,
+  ): string {
+    const raw = from?.(c) ?? c.query(this.config.sessionIdParam);
+    if (typeof raw === "string" && raw.trim()) return raw;
+    return this.config.sessionIdDefault;
+  }
+}

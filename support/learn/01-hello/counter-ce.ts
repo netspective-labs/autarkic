@@ -16,6 +16,7 @@
  */
 
 import { Application, textResponse } from "../../../lib/continuux/http.ts";
+import { CxMiddlewareBuilder } from "../../../lib/continuux/interaction.ts";
 import * as H from "../../../lib/natural-html/elements.ts";
 
 type State = { count: number };
@@ -27,45 +28,22 @@ type CeSseEvents = {
   status: { text: string };
 };
 
+const sseBuilder = new CxMiddlewareBuilder<CeSseEvents>({
+  sseUrl: "/ce/sse",
+  importUrl: "/.cx/browser-ua-aide.js",
+  postUrl: "/ce/action",
+});
+const hub = sseBuilder.hub;
+
 const here = new URL(".", import.meta.url);
 const fsPath = (rel: string) => new URL(rel, here);
 
-const normalizeSid = (sid: string | null | undefined) => {
-  const s = String(sid ?? "").trim();
-  if (!s || s === "unknown") return null;
-  return s;
-};
+const pageHtml = (): string => {
+  const aideAttrs = sseBuilder.userAgentAide.attrs;
+  const { sseUrl, postUrl, sseWithCredentials } = sseBuilder.config;
+  const sseCredValue = sseWithCredentials ? "true" : "false";
 
-// SSE hub (typed server -> client events)
-type Session = {
-  send: <K extends keyof CeSseEvents>(e: K, d: CeSseEvents[K]) => boolean;
-  sendWhenReady: <K extends keyof CeSseEvents>(
-    e: K,
-    d: CeSseEvents[K],
-  ) => Promise<boolean>;
-  isClosed: () => boolean;
-  close: () => void;
-  ready: Promise<void>;
-};
-
-const sessions = new Map<string, Session>();
-
-const broadcast = <K extends keyof CeSseEvents>(
-  event: K,
-  data: CeSseEvents[K],
-) => {
-  for (const [sid, s] of sessions) {
-    if (s.isClosed()) {
-      sessions.delete(sid);
-      continue;
-    }
-    const ok = s.send(event, data);
-    if (!ok) sessions.delete(sid);
-  }
-};
-
-const pageHtml = (): string =>
-  H.render(
+  return H.render(
     H.doctype(),
     H.html(
       {},
@@ -90,12 +68,10 @@ const pageHtml = (): string =>
           ),
           H.article(
             H.customElement("counter-ce")({
-              // what CxAide expects
-              "data-cx-sse-url": "/ce/sse",
-              "data-cx-action-url": "/ce/action", // if CxAide uses action-url
-              "data-cx-post-url": "/ce/action", // if CxAide uses post-url (safe to include both)
-              "data-cx-sse-with-credentials": "true",
-
+              [aideAttrs.sseUrl]: sseUrl,
+              "data-cx-action-url": postUrl,
+              [aideAttrs.postUrl]: postUrl,
+              [aideAttrs.sseWithCredentials]: sseCredValue,
               style: "display:block;",
             }),
           ),
@@ -115,8 +91,19 @@ const pageHtml = (): string =>
       ),
     ),
   );
+};
 
 const app = Application.sharedState<State, Vars>(appState);
+
+app.use(
+  sseBuilder.middleware<State, Vars>({
+    uaCacheControl: "no-store",
+    onConnect: async ({ session }) => {
+      await session.sendWhenReady("count", { value: appState.count });
+      await session.sendWhenReady("status", { text: "connected" });
+    },
+  }),
+);
 
 app.get("/", () =>
   new Response(pageHtml(), {
@@ -142,55 +129,6 @@ app.get("/counter-ce.js", async () => {
   });
 });
 
-// Serve the reusable aide module (plain JS).
-app.get("/.cx/browser-ua-aide.js", async () => {
-  const p = await Deno.realPath(
-    fsPath("../../../lib/continuux/browser-ua-aide.js"),
-  );
-  const js = await Deno.readTextFile(p);
-  return new Response(js, {
-    headers: {
-      "content-type": "text/javascript; charset=utf-8",
-      "cache-control": "no-store",
-    },
-  });
-});
-
-app.get("/ce/sse", (c) =>
-  c.sse<CeSseEvents>(async (session) => {
-    const sid = normalizeSid(c.query("sessionId"));
-    if (!sid) {
-      try {
-        session.close();
-      } catch {
-        // ignore
-      }
-      return;
-    }
-
-    // Replace existing session for same sid
-    const prior = sessions.get(sid);
-    if (prior) {
-      try {
-        prior.close();
-      } catch {
-        // ignore
-      }
-      sessions.delete(sid);
-    }
-
-    sessions.set(sid, session as unknown as Session);
-
-    await session.sendWhenReady("count", { value: appState.count });
-    await session.sendWhenReady("status", { text: "connected" });
-
-    void session.ready.then(() => {
-      queueMicrotask(() => {
-        if (session.isClosed()) sessions.delete(sid);
-      });
-    });
-  }));
-
 // Command endpoint
 app.post("/ce/action", async (c) => {
   const body = await c.readJson().catch(() => null);
@@ -207,8 +145,8 @@ app.post("/ce/action", async (c) => {
   if (action === "increment") appState.count += 1;
   else appState.count = 0;
 
-  broadcast("count", { value: appState.count });
-  broadcast("status", { text: `ok:${action}` });
+  hub.broadcast("count", { value: appState.count });
+  hub.broadcast("status", { text: `ok:${action}` });
 
   return new Response(null, { status: 204 });
 });
