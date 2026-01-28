@@ -25,11 +25,14 @@ import {
   sidebarHeader,
 } from "../../../lib/natural-ds/mod.ts";
 import { icons } from "../../../lib/natural-html/assets.ts";
+import { devExperienceAide as devExperienceAide } from "../../../lib/natural-dx/aide.ts";
 import * as H from "../../../lib/natural-html/elements.ts";
 import { combineHast, headSlots } from "../../../lib/natural-html/patterns.ts";
 
 type State = Record<string, never>;
 type Vars = Record<string, never>;
+
+const devHub = devExperienceAide<State, Vars>();
 
 const app = Application.sharedState<State, Vars>({});
 const ds = naturalDesignSystem();
@@ -87,7 +90,7 @@ const pageHtml = (): string => {
         ),
     },
     headSlots: headSlots({
-      title: "ContinuUX Hello (Natural DS)",
+      title: "ContinuUX Hello using Natural Design System",
       meta: [
         H.meta({ charset: "utf-8" }),
         H.meta({
@@ -109,6 +112,7 @@ app.use(async (c, next) => {
   console.log("[req]", c.req.method, u.pathname);
   return await next();
 });
+app.use(devHub.middleware);
 
 app.get("/", () =>
   new Response(pageHtml(), {
