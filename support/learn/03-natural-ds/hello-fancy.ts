@@ -50,6 +50,11 @@ import {
   headSlots,
   type RenderInput,
 } from "../../../lib/natural-html/patterns.ts";
+import {
+  pitchCtaActions,
+  pitchHeroButton,
+  pitchHeroVisual,
+} from "../../../lib/natural-ds/component/pitch.ts";
 
 type State = Record<string, never>;
 type Vars = Record<string, never>;
@@ -186,37 +191,6 @@ const docsPageHtml = (): string => {
 
 type DsCtx = RenderCtx<RenderInput, NamingStrategy>;
 
-const pitchHeroButton = (
-  ctx: DsCtx,
-  label: string,
-  href: string,
-  primary = true,
-) =>
-  H.a(
-    {
-      href,
-      style: ctx.css({
-        borderRadius: "999px",
-        padding: "14px 34px",
-        fontSize: "0.95rem",
-        fontWeight: 600,
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        letterSpacing: "0.01em",
-        textDecoration: "none",
-        transition: "transform 0.15s ease, box-shadow 0.15s ease",
-        backgroundColor: primary ? "#1c1b1a" : "transparent",
-        color: primary ? "#fefcf7" : "#1b1a17",
-        border: primary ? "none" : "1px solid rgba(27, 26, 22, 0.35)",
-        boxShadow: primary
-          ? "0 12px 30px rgba(27, 26, 22, 0.35)"
-          : "0 0 0 rgba(0, 0, 0, 0)",
-      }),
-    },
-    H.text(label),
-  );
-
 const pitchFeatureCards = (ctx: DsCtx) =>
   featureGrid(ctx, {
     cards: [
@@ -278,77 +252,10 @@ const pitchDocsHighlights = (ctx: DsCtx) =>
     }),
   );
 
-const pitchHeroVisual = (ctx: DsCtx) =>
-  H.div(
-    {
-      style: ctx.css({
-        borderRadius: "28px",
-        minHeight: "220px",
-        background:
-          "radial-gradient(circle at 20% 20%, rgba(255,255,255,0.65), rgba(187, 147, 96, 0.4)), linear-gradient(180deg, #0a0a0a, #191616)",
-        padding: "24px 32px",
-        color: "#f4f1ea",
-        boxShadow: "0 30px 60px rgba(0,0,0,0.35)",
-        display: "flex",
-        flexDirection: "column",
-        gap: "12px",
-        fontFamily: "SF Mono, Monaco, 'Courier New', monospace",
-      }),
-    },
-    H.span(
-      {
-        style: ctx.css({
-          letterSpacing: "0.25em",
-          textTransform: "uppercase",
-          fontSize: "0.65rem",
-          color: "#f97316",
-        }),
-      },
-      "Launch stack",
-    ),
-    H.div(
-      { style: ctx.css({ fontSize: "1.8rem", lineHeight: 1.2 }) },
-      "Autarkic · ContinuUX · Natural DS",
-    ),
-    H.codeTag("deno run -A --watch support/learn/03-natural-ds/guide.ts"),
-    H.div(
-      {
-        style: ctx.css({
-          display: "flex",
-          justifyContent: "space-between",
-          marginTop: "auto",
-          fontSize: "0.85rem",
-        }),
-      },
-      H.span("Docs ready"),
-      H.span("CI friendly"),
-    ),
-  );
-
 const pitchTryItSnippet = (ctx: DsCtx) =>
   codeBlock(ctx, {
     content: H.codeTag("deno run -A --watch support/learn/03-natural-ds/guide.ts"),
   });
-
-const pitchCtaActions = (ctx: DsCtx) =>
-  H.div(
-    {
-      style: ctx.css({
-        display: "flex",
-        gap: "16px",
-        flexWrap: "wrap",
-        justifyContent: "center",
-      }),
-    },
-    pitchHeroButton(ctx, "View docs", "/docs", true),
-    pitchHeroButton(
-      ctx,
-      "Open GitHub",
-      "https://github.com/netspective-labs/autarkic",
-      false,
-    ),
-  );
-
 const pitchPageHtml = (): string => {
   const page = ds.page("NaturalPitch", {}, {
     slots: {
@@ -359,15 +266,27 @@ const pitchPageHtml = (): string => {
           "Ship documentation, APIs, and automation with a single Deno-native runtime powered by ContinuUX and Natural Design System.",
         ),
       heroPrimaryAction: (ctx) =>
-        pitchHeroButton(ctx, "View docs", "/docs", true),
+        pitchHeroButton(ctx, {
+          label: "View docs",
+          href: "/docs",
+          primary: true,
+        }),
       heroSecondaryAction: (ctx) =>
-        pitchHeroButton(
-          ctx,
-          "Explore GitHub",
-          "https://github.com/netspective-labs/autarkic",
-          false,
-        ),
-      heroVisual: pitchHeroVisual,
+        pitchHeroButton(ctx, {
+          label: "Explore GitHub",
+          href: "https://github.com/netspective-labs/autarkic",
+          primary: false,
+          target: "_blank",
+          rel: "noreferrer",
+        }),
+      heroVisual: (ctx) =>
+        pitchHeroVisual(ctx, {
+          badge: "Launch stack",
+          title: "Autarkic · ContinuUX · Natural DS",
+          command: "deno run -A --watch support/learn/03-natural-ds/guide.ts",
+          footerLeft: "Docs ready",
+          footerRight: "CI friendly",
+        }),
       featureIntro: (ctx) =>
         bodyText(ctx, {
           content:
@@ -377,7 +296,17 @@ const pitchPageHtml = (): string => {
       tryItSnippet: pitchTryItSnippet,
       docsHighlights: pitchDocsHighlights,
       ctaTitle: () => H.text("Ready to launch your docs and APIs?"),
-      ctaActions: pitchCtaActions,
+      ctaActions: (ctx) =>
+        pitchCtaActions(ctx, [
+          { label: "View docs", href: "/docs", primary: true },
+          {
+            label: "Open GitHub",
+            href: "https://github.com/netspective-labs/autarkic",
+            primary: false,
+            target: "_blank",
+            rel: "noreferrer",
+          },
+        ]),
       footerNote: () =>
         H.text(
           "Built for product teams, automation engineers, and documentation squads who need a predictable UI shell.",

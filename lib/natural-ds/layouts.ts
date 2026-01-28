@@ -56,14 +56,14 @@ export const naturalPitchLayout = defineLayout({
       "heroTitle",
       "heroSubtitle",
       "heroPrimaryAction",
+    ] as const,
+    optional: [
       "heroSecondaryAction",
       "featureIntro",
       "featureCards",
       "docsHighlights",
       "ctaTitle",
       "ctaActions",
-    ] as const,
-    optional: [
       "heroBadge",
       "heroVisual",
       "tryItSnippet",
@@ -80,6 +80,14 @@ export const naturalPitchLayout = defineLayout({
       ? s.testimonialCards(ctx)
       : null;
     const footerNote = s.footerNote ? s.footerNote(ctx) : null;
+    const heroSecondaryAction = s.heroSecondaryAction
+      ? s.heroSecondaryAction(ctx)
+      : null;
+    const featureIntroContent = s.featureIntro ? s.featureIntro(ctx) : null;
+    const featureCards = s.featureCards ? s.featureCards(ctx) : null;
+    const docsHighlights = s.docsHighlights ? s.docsHighlights(ctx) : null;
+    const ctaTitle = s.ctaTitle ? s.ctaTitle(ctx) : null;
+    const ctaActions = s.ctaActions ? s.ctaActions(ctx) : null;
 
     const heroActions = h.div(
       {
@@ -92,7 +100,7 @@ export const naturalPitchLayout = defineLayout({
         }),
       },
       s.heroPrimaryAction(ctx),
-      s.heroSecondaryAction(ctx),
+      heroSecondaryAction,
     );
 
     return h.div(
@@ -197,142 +205,158 @@ export const naturalPitchLayout = defineLayout({
             )
             : null,
         ),
-        h.section(
-          {
-            class: "pitch-intro",
-            style: ctx.css({
-              borderRadius: "32px",
-              padding: "36px",
-              backgroundColor: "#ffffff",
-              boxShadow: "0 18px 36px rgba(15, 13, 11, 0.08)",
-              display: "flex",
-              flexDirection: "column",
-              gap: "24px",
-            }),
-          },
-          h.div(
+        featureIntroContent || tryItSnippet
+          ? h.section(
             {
-              class: "pitch-intro-copy",
+              class: "pitch-intro",
               style: ctx.css({
-                fontSize: "1rem",
-                color: "#2a241f",
-                lineHeight: 1.7,
+                borderRadius: "32px",
+                padding: "36px",
+                backgroundColor: "#ffffff",
+                boxShadow: "0 18px 36px rgba(15, 13, 11, 0.08)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "24px",
               }),
             },
-            s.featureIntro(ctx),
-          ),
-          tryItSnippet
-            ? h.div(
-              {
-                class: "pitch-try-it",
-                style: ctx.css({
-                  borderRadius: "26px",
-                  padding: "28px",
-                  background:
-                    "linear-gradient(180deg, rgba(255,255,255,0.9) 0%, #f0eddf 100%)",
-                  border: "1px solid rgba(255, 255, 255, 0.7)",
-                  boxShadow: "0 10px 30px rgba(10, 10, 10, 0.12)",
-                }),
-              },
-              tryItSnippet,
-            )
-            : null,
-        ),
-        h.section(
-          {
-            class: "pitch-feature-grid",
-            style: ctx.css({
-              display: "flex",
-              flexDirection: "column",
-              gap: "20px",
-            }),
-          },
-          h.div(
+            featureIntroContent
+              ? h.div(
+                {
+                  class: "pitch-intro-copy",
+                  style: ctx.css({
+                    fontSize: "1rem",
+                    color: "#2a241f",
+                    lineHeight: 1.7,
+                  }),
+                },
+                featureIntroContent,
+              )
+              : null,
+            tryItSnippet
+              ? h.div(
+                {
+                  class: "pitch-try-it",
+                  style: ctx.css({
+                    borderRadius: "26px",
+                    padding: "28px",
+                    background:
+                      "linear-gradient(180deg, rgba(255,255,255,0.9) 0%, #f0eddf 100%)",
+                    border: "1px solid rgba(255, 255, 255, 0.7)",
+                    boxShadow: "0 10px 30px rgba(10, 10, 10, 0.12)",
+                  }),
+                },
+                tryItSnippet,
+              )
+              : null,
+          )
+          : null,
+        (featureCards || testimonialCards)
+          ? h.section(
             {
-              class: "feature-grid-inner",
+              class: "pitch-feature-grid",
               style: ctx.css({
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+                display: "flex",
+                flexDirection: "column",
                 gap: "20px",
               }),
             },
-            s.featureCards(ctx),
-          ),
-          testimonialCards
-            ? h.div(
-              {
-                class: "testimonial-strip",
-                style: ctx.css({
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                  gap: "18px",
-                }),
-              },
-              testimonialCards,
-            )
-            : null,
-        ),
-        h.section(
-          {
-            class: "docs-highlight-section",
-            style: ctx.css({
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-              gap: "24px",
-            }),
-          },
-          s.docsHighlights(ctx),
-        ),
-        h.section(
-          {
-            class: "pitch-cta",
-            style: ctx.css({
-              borderRadius: "34px",
-              padding: "36px",
-              backgroundColor: "#1b1a17",
-              color: "#f9f6ef",
-              textAlign: "center",
-              boxShadow: "0 22px 45px rgba(4, 3, 2, 0.24)",
-            }),
-          },
-          h.h2(
+            featureCards
+              ? h.div(
+                {
+                  class: "feature-grid-inner",
+                  style: ctx.css({
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+                    gap: "20px",
+                  }),
+                },
+                featureCards,
+              )
+              : null,
+            testimonialCards
+              ? h.div(
+                {
+                  class: "testimonial-strip",
+                  style: ctx.css({
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                    gap: "18px",
+                  }),
+                },
+                testimonialCards,
+              )
+              : null,
+          )
+          : null,
+        docsHighlights
+          ? h.section(
             {
-              class: "cta-title",
+              class: "docs-highlight-section",
               style: ctx.css({
-                fontSize: "2rem",
-                margin: "0 0 20px",
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+                gap: "24px",
               }),
             },
-            s.ctaTitle(ctx),
-          ),
-          h.div(
+            docsHighlights,
+          )
+          : null,
+        ctaTitle || ctaActions || footerNote
+          ? h.section(
             {
-              class: "cta-actions",
+              class: "pitch-cta",
               style: ctx.css({
-                display: "flex",
-                justifyContent: "center",
-                gap: "16px",
-                flexWrap: "wrap",
+                borderRadius: "34px",
+                padding: "36px",
+                backgroundColor: "#1b1a17",
+                color: "#f9f6ef",
+                textAlign: "center",
+                boxShadow: "0 22px 45px rgba(4, 3, 2, 0.24)",
               }),
             },
-            s.ctaActions(ctx),
-          ),
-          footerNote
-            ? h.p(
-              {
-                class: "cta-footer-note",
-                style: ctx.css({
-                  margin: "26px auto 0",
-                  maxWidth: "640px",
-                  color: "rgba(249, 246, 239, 0.75)",
-                  fontSize: "0.95rem",
-                  lineHeight: 1.5,
-                }),
-              },
-              footerNote,
-            )
-            : null,
-        ),
+            ctaTitle
+              ? h.h2(
+                {
+                  class: "cta-title",
+                  style: ctx.css({
+                    fontSize: "2rem",
+                    margin: "0 0 20px",
+                  }),
+                },
+                ctaTitle,
+              )
+              : null,
+            ctaActions
+              ? h.div(
+                {
+                  class: "cta-actions",
+                  style: ctx.css({
+                    display: "flex",
+                    justifyContent: "center",
+                    gap: "16px",
+                    flexWrap: "wrap",
+                  }),
+                },
+                ctaActions,
+              )
+              : null,
+            footerNote
+              ? h.p(
+                {
+                  class: "cta-footer-note",
+                  style: ctx.css({
+                    margin: "26px auto 0",
+                    maxWidth: "640px",
+                    color: "rgba(249, 246, 239, 0.75)",
+                    fontSize: "0.95rem",
+                    lineHeight: 1.5,
+                  }),
+                },
+                footerNote,
+              )
+              : null,
+          )
+          : null,
       ),
     );
   },
