@@ -1,9 +1,11 @@
 /**
- * Development aids for ContinuUX apps that need hot-reload behavior without a JS build pipeline.
+ * Developer experiences helpers for ContinuUX apps that need hot-reload
+ * behavior without a JS build pipeline.
  *
- * This module injects a tiny SSE watcher script into every HTML response, exposes a reload
- * stream endpoint, and provides helpers to broadcast reload events so browsers refresh whenever
- * the backend restarts or you trigger a manual push.
+ * This module injects a tiny SSE watcher script into every HTML response,
+ * exposes a reload stream endpoint, and provides helpers to broadcast reload
+ * events so browsers refresh whenever the backend restarts or you trigger a
+ * manual push.
  *
  * ## Usage
  *

@@ -24,8 +24,8 @@ import {
   pageHeader,
   sidebarHeader,
 } from "../../../lib/natural-ds/mod.ts";
+import { devExperienceAide } from "../../../lib/natural-dx/aide.ts";
 import { icons } from "../../../lib/natural-html/assets.ts";
-import { devExperienceAide as devExperienceAide } from "../../../lib/natural-dx/aide.ts";
 import * as H from "../../../lib/natural-html/elements.ts";
 import { combineHast, headSlots } from "../../../lib/natural-html/patterns.ts";
 
