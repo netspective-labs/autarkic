@@ -19,13 +19,21 @@
 
 import { autoTsJsBundler } from "../../../lib/continuux/bundle.ts";
 import { Application } from "../../../lib/continuux/http.ts";
+import type {
+  NamingStrategy,
+  RenderCtx,
+} from "../../../lib/natural-html/design-system.ts";
 import {
   bodyText,
   breadcrumbItem,
+  callout,
+  codeBlock,
   contextBrand,
   contextHeaderContent,
   contextNavLink,
   contextUser,
+  featureCard,
+  featureGrid,
   naturalDesignSystem,
   navLink,
   navSection,
@@ -37,7 +45,11 @@ import {
 } from "../../../lib/natural-ds/mod.ts";
 import { icons } from "../../../lib/natural-html/assets.ts";
 import * as H from "../../../lib/natural-html/elements.ts";
-import { combineHast, headSlots } from "../../../lib/natural-html/patterns.ts";
+import {
+  combineHast,
+  headSlots,
+  type RenderInput,
+} from "../../../lib/natural-html/patterns.ts";
 
 type State = Record<string, never>;
 type Vars = Record<string, never>;
@@ -58,7 +70,7 @@ This page demonstrates:
 If you change \`/example.md\`, refresh the page and you will see the updated render.
 `;
 
-const pageHtml = (): string => {
+const docsPageHtml = (): string => {
   const page = ds.page("NaturalDoc", {}, {
     slots: {
       contextHeader: (ctx) =>
@@ -172,6 +184,221 @@ const pageHtml = (): string => {
   return H.render(page);
 };
 
+type DsCtx = RenderCtx<RenderInput, NamingStrategy>;
+
+const pitchHeroButton = (
+  ctx: DsCtx,
+  label: string,
+  href: string,
+  primary = true,
+) =>
+  H.a(
+    {
+      href,
+      style: ctx.css({
+        borderRadius: "999px",
+        padding: "14px 34px",
+        fontSize: "0.95rem",
+        fontWeight: 600,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        letterSpacing: "0.01em",
+        textDecoration: "none",
+        transition: "transform 0.15s ease, box-shadow 0.15s ease",
+        backgroundColor: primary ? "#1c1b1a" : "transparent",
+        color: primary ? "#fefcf7" : "#1b1a17",
+        border: primary ? "none" : "1px solid rgba(27, 26, 22, 0.35)",
+        boxShadow: primary
+          ? "0 12px 30px rgba(27, 26, 22, 0.35)"
+          : "0 0 0 rgba(0, 0, 0, 0)",
+      }),
+    },
+    H.text(label),
+  );
+
+const pitchFeatureCards = (ctx: DsCtx) =>
+  featureGrid(ctx, {
+    cards: [
+      featureCard(ctx, {
+        icon: "📚",
+        title: "Autarkic",
+        description: "Deno-first UI shell for docs, automation, and dashboards.",
+      }),
+      featureCard(ctx, {
+        icon: "🚀",
+        title: "ContinuUX",
+        description:
+          "Typed HTTP routing, proxies, and bundlers designed for curated experiences.",
+      }),
+      featureCard(ctx, {
+        icon: "🎨",
+        title: "Natural DS",
+        description:
+          "Structural layouts, regions, and components for docs-quality design.",
+      }),
+      featureCard(ctx, {
+        icon: "🧬",
+        title: "Natural HTML",
+        description:
+          "Runtime primitives with deterministic rendering and head slot control.",
+      }),
+    ],
+  });
+
+const pitchDocsHighlights = (ctx: DsCtx) =>
+  H.div(
+    {
+      style: ctx.css({
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+        gap: "18px",
+      }),
+    },
+    callout(ctx, {
+      title: "Library-grade services",
+      icon: icons.info,
+      variant: "info",
+      content:
+        "Autarkic pairs Natural DS with ContinuUX bundles so you can ship docs and APIs from the same runtime.",
+    }),
+    callout(ctx, {
+      title: "ContinuUX HTTP first",
+      icon: icons.tip,
+      variant: "tip",
+      content:
+        "Typed routing, proxies, and bundlers keep documentation, GitHub previews, and APIs in sync.",
+    }),
+    callout(ctx, {
+      title: "Design system confidence",
+      icon: icons.info,
+      variant: "info",
+      content:
+        "Natural HTML, Natural DS, and custom layout slots deliver deterministic styles with no runtime magic.",
+    }),
+  );
+
+const pitchHeroVisual = (ctx: DsCtx) =>
+  H.div(
+    {
+      style: ctx.css({
+        borderRadius: "28px",
+        minHeight: "220px",
+        background:
+          "radial-gradient(circle at 20% 20%, rgba(255,255,255,0.65), rgba(187, 147, 96, 0.4)), linear-gradient(180deg, #0a0a0a, #191616)",
+        padding: "24px 32px",
+        color: "#f4f1ea",
+        boxShadow: "0 30px 60px rgba(0,0,0,0.35)",
+        display: "flex",
+        flexDirection: "column",
+        gap: "12px",
+        fontFamily: "SF Mono, Monaco, 'Courier New', monospace",
+      }),
+    },
+    H.span(
+      {
+        style: ctx.css({
+          letterSpacing: "0.25em",
+          textTransform: "uppercase",
+          fontSize: "0.65rem",
+          color: "#f97316",
+        }),
+      },
+      "Launch stack",
+    ),
+    H.div(
+      { style: ctx.css({ fontSize: "1.8rem", lineHeight: 1.2 }) },
+      "Autarkic · ContinuUX · Natural DS",
+    ),
+    H.codeTag("deno run -A --watch support/learn/03-natural-ds/guide.ts"),
+    H.div(
+      {
+        style: ctx.css({
+          display: "flex",
+          justifyContent: "space-between",
+          marginTop: "auto",
+          fontSize: "0.85rem",
+        }),
+      },
+      H.span("Docs ready"),
+      H.span("CI friendly"),
+    ),
+  );
+
+const pitchTryItSnippet = (ctx: DsCtx) =>
+  codeBlock(ctx, {
+    content: H.codeTag("deno run -A --watch support/learn/03-natural-ds/guide.ts"),
+  });
+
+const pitchCtaActions = (ctx: DsCtx) =>
+  H.div(
+    {
+      style: ctx.css({
+        display: "flex",
+        gap: "16px",
+        flexWrap: "wrap",
+        justifyContent: "center",
+      }),
+    },
+    pitchHeroButton(ctx, "View docs", "/docs", true),
+    pitchHeroButton(
+      ctx,
+      "Open GitHub",
+      "https://github.com/netspective-labs/autarkic",
+      false,
+    ),
+  );
+
+const pitchPageHtml = (): string => {
+  const page = ds.page("NaturalPitch", {}, {
+    slots: {
+      heroBadge: () => H.text("Autarkic library"),
+      heroTitle: () => H.text("Autarkic is the sales-ready docs shell"),
+      heroSubtitle: () =>
+        H.text(
+          "Ship documentation, APIs, and automation with a single Deno-native runtime powered by ContinuUX and Natural Design System.",
+        ),
+      heroPrimaryAction: (ctx) =>
+        pitchHeroButton(ctx, "View docs", "/docs", true),
+      heroSecondaryAction: (ctx) =>
+        pitchHeroButton(
+          ctx,
+          "Explore GitHub",
+          "https://github.com/netspective-labs/autarkic",
+          false,
+        ),
+      heroVisual: pitchHeroVisual,
+      featureIntro: (ctx) =>
+        bodyText(ctx, {
+          content:
+            "Autarkic bundles Natural DS layouts, Natural HTML primitives, and ContinuUX services so your docs, demos, and proxies stay in sync.",
+        }),
+      featureCards: pitchFeatureCards,
+      tryItSnippet: pitchTryItSnippet,
+      docsHighlights: pitchDocsHighlights,
+      ctaTitle: () => H.text("Ready to launch your docs and APIs?"),
+      ctaActions: pitchCtaActions,
+      footerNote: () =>
+        H.text(
+          "Built for product teams, automation engineers, and documentation squads who need a predictable UI shell.",
+        ),
+    },
+    headSlots: headSlots({
+      title: "Autarkic Pitch",
+      meta: [
+        H.meta({ charset: "utf-8" }),
+        H.meta({
+          name: "viewport",
+          content: "width=device-width, initial-scale=1",
+        }),
+      ],
+    }),
+    styleAttributeEmitStrategy: "head",
+  });
+
+  return H.render(page);
+};
+
 // Put middleware BEFORE routes.
 // 1) Add a top-level request logger middleware FIRST.
 app.use(async (c, next) => {
@@ -192,7 +419,12 @@ app.use(
 );
 
 app.get("/", () =>
-  new Response(pageHtml(), {
+  new Response(pitchPageHtml(), {
+    headers: { "content-type": "text/html; charset=utf-8" },
+  }));
+
+app.get("/docs", () =>
+  new Response(docsPageHtml(), {
     headers: { "content-type": "text/html; charset=utf-8" },
   }));
 
