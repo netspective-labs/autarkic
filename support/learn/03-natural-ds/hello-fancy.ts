@@ -197,7 +197,8 @@ const pitchFeatureCards = (ctx: DsCtx) =>
       featureCard(ctx, {
         icon: "📚",
         title: "Autarkic",
-        description: "Deno-first UI shell for docs, automation, and dashboards.",
+        description:
+          "Deno-first UI shell for docs, automation, and dashboards.",
       }),
       featureCard(ctx, {
         icon: "🚀",
@@ -254,7 +255,9 @@ const pitchDocsHighlights = (ctx: DsCtx) =>
 
 const pitchTryItSnippet = (ctx: DsCtx) =>
   codeBlock(ctx, {
-    content: H.codeTag("deno run -A --watch support/learn/03-natural-ds/guide.ts"),
+    content: H.codeTag(
+      "deno run -A --watch support/learn/03-natural-ds/guide.ts",
+    ),
   });
 const pitchPageHtml = (): string => {
   const page = ds.page("NaturalPitch", {}, {

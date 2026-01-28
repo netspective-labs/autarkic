@@ -85,7 +85,10 @@ export const pitchHeroVisual = (
         props.badge,
       )
       : null,
-    h.div({ style: ctx.css({ fontSize: "1.8rem", lineHeight: 1.2 }) }, props.title),
+    h.div(
+      { style: ctx.css({ fontSize: "1.8rem", lineHeight: 1.2 }) },
+      props.title,
+    ),
     h.codeTag(props.command),
     (props.footerLeft || props.footerRight)
       ? h.div(

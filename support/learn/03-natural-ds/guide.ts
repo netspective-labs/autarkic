@@ -198,12 +198,14 @@ const pitchFeatureCards = (ctx: DsRenderCtx) =>
       featureCard(ctx, {
         icon: "🧱",
         title: "Composable highlights",
-        description: "Stack cards, testimonials, and docs highlights without layout plumbing.",
+        description:
+          "Stack cards, testimonials, and docs highlights without layout plumbing.",
       }),
       featureCard(ctx, {
         icon: "⚙️",
         title: "Docs for engineers",
-        description: "Support copy, code, and CLI hooks with consistent spacing.",
+        description:
+          "Support copy, code, and CLI hooks with consistent spacing.",
       }),
     ],
   });
