@@ -108,17 +108,6 @@ const resources = [
     teaches:
       "Comprehensive Natural DS reference mirroring `lib/natural-ds`, showcasing accordions, cards, grids, nav components, and more.",
   },
-  {
-    id: "natural-om-guide",
-    name: "Natural Object Model Guide",
-    description: "demo of Natural Object Model Builder (OMB)",
-    path: "support/learn/05-natural-om/index.ts",
-    // Served by this server via /projectfs
-    entry: "support/learn/05-natural-om/guide.html",
-    port: indexPort,
-    teaches:
-      "Comprehensive Natural OMB reference, showcasing how to easily transform XML to typed-ish JavaScript objects.",
-  },
 ] satisfies LearningResource[];
 
 const resourceById = new Map(resources.map((r) => [r.id, r]));
